@@ -5,6 +5,7 @@ import threading
 import json
 import os
 from flask import Flask
+from collections import Counter
 
 app = Flask(__name__)
 SAVE_FILE = "save.json"
@@ -39,10 +40,32 @@ def save_now():
 
 load_save()
 
+def format_backpack(inventory):
+    counter = Counter(inventory)
+    seen = []
+    for i in inventory:
+        if i not in seen:
+            seen.append(i)
+    lines = []
+    for name in seen:
+        c = counter[name]
+        if c > 1:
+            lines.append(f"{name} x{c}")
+        else:
+            lines.append(name)
+    return lines, counter
+
+def get_unique_for_trade(inventory):
+    seen = []
+    for i in inventory:
+        if i not in seen:
+            seen.append(i)
+    return seen
+
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v17.3 | {len(players)}人 {total}km"
+    return f"Kettenkrad v17.5 | {len(players)}人 {total}km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -159,9 +182,16 @@ class TradeView(discord.ui.View):
         inv = inventory or []
         if not inv:
             return
-        opts = [discord.SelectOption(label=i[:100], value=i) for i in inv[:25]]
+        _, counter = format_backpack(inv)
+        unique = get_unique_for_trade(inv)
+        opts = []
+        for idx, item in enumerate(unique[:25]):
+            cnt = counter[item]
+            label = f"{item} (x{cnt})" if cnt > 1 else item
+            opts.append(discord.SelectOption(label=label[:100], value=f"{idx}|{item}"))
+        
         self.select_give = discord.ui.Select(
-            placeholder=f"选择要给 {npc_name or '对方'} 的物品",
+            placeholder=f"选择物品 - 共{len(inv)}件 {len(unique)}种",
             min_values=1, max_values=1, options=opts
         )
         self.select_give.callback = self.select_callback
@@ -171,9 +201,10 @@ class TradeView(discord.ui.View):
         if interaction.user.id != self.from_id:
             await interaction.response.send_message("❌ 不是你的交易", ephemeral=True)
             return
-        self.offer = self.select_give.values[0]
-        await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(f"已选择：**{self.offer}** ，点下方 ✅确认 交易", ephemeral=True)
+        raw = self.select_give.values[0]
+        _, item_name = raw.split("|", 1)
+        self.offer = item_name
+        await interaction.response.send_message(f"已选择：**{self.offer}** ，点下方 ✅确认 交易", ephemeral=True)
 
     @discord.ui.button(label="确认交易", style=discord.ButtonStyle.success, emoji="🤝")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -371,7 +402,13 @@ async def 步行(interaction: discord.Interaction):
 @bot.tree.command(name="背包", description="背包")
 async def 背包(interaction: discord.Interaction):
     d=get_player(interaction.user.id)
-    await interaction.response.send_message(embed=discord.Embed(title=f"{d['km']}/1000km 背包", description="\n".join(d["inventory"][-30:]), color=0x8b9a7d))
+    lines, _ = format_backpack(d["inventory"])
+    text = "\n".join(lines) if lines else "空空如也"
+    if len(text) > 3500:
+        text = text[-3500:]
+    embed = discord.Embed(title=f"{d['km']}/1000km 背包", description=text, color=0x8b9a7d)
+    embed.set_footer(text=f"共{len(d['inventory'])}件 | 食物{d['food']} 燃料{d['fuel']}")
+    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="交易", description="交易")
 @discord.app_commands.choices(npc=[discord.app_commands.Choice(name=k, value=k) for k in ALL_NPCS.keys()])
@@ -394,7 +431,7 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
             if dist > 15:
                 await interaction.followup.send(embed=discord.Embed(
                     title="❌ 他已经不在这里了",
-                    description=f"你在 {met_at}km 遇到 {npc}，现在已经 {d['km']}km，离开了 {dist}km。\n\n他已经继续自己的旅途了...",
+                    description=f"你在 {met_at}km 遇到 {npc}，现在已经 {d['km']}km，离开了 {dist}km。",
                     color=0x555555
                 ), ephemeral=True)
                 return
@@ -425,7 +462,7 @@ async def 图鉴(interaction: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Bot 上线 v17.3 - 3-5km最终版")
+    print("Bot 上线 v17.5 - 背包合并")
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
