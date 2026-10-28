@@ -62,10 +62,31 @@ def get_unique_for_trade(inventory):
             seen.append(i)
     return seen
 
+def get_food_value(name):
+    if "压缩口粮 x10" in name or "军用口粮 x10" in name: return 10
+    if "土豆干 x2" in name: return 2
+    if "压缩口粮 x1" in name: return 1
+    if name == "土豆干": return 1
+    if "土豆干 x10" in name: return 10
+    return 0
+
+def get_fuel_value(name):
+    if "燃料桶 x20" in name: return 20
+    if "燃料桶(半满)" in name: return 5
+    if name == "燃料桶": return 5
+    return 0
+
+def sync_item(p, item_name, add=True):
+    sign = 1 if add else -1
+    f = get_food_value(item_name)
+    fu = get_fuel_value(item_name)
+    if f: p["food"] = max(0, p["food"] + f * sign)
+    if fu: p["fuel"] = max(0, p["fuel"] + fu * sign)
+
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v17.5 | {len(players)}人 {total}km"
+    return f"Kettenkrad v17.9 All Merge + Airplane IMG | {len(players)}人 {total}km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -189,7 +210,6 @@ class TradeView(discord.ui.View):
             cnt = counter[item]
             label = f"{item} (x{cnt})" if cnt > 1 else item
             opts.append(discord.SelectOption(label=label[:100], value=f"{idx}|{item}"))
-        
         self.select_give = discord.ui.Select(
             placeholder=f"选择物品 - 共{len(inv)}件 {len(unique)}种",
             min_values=1, max_values=1, options=opts
@@ -218,10 +238,12 @@ class TradeView(discord.ui.View):
         if self.offer not in p["inventory"]:
             await interaction.response.send_message("❌ 物品已不存在", ephemeral=True)
             return
+        sync_item(p, self.offer, add=False)
         if self.npc_name:
             reward = roll(self.npc_name)
             p["inventory"].remove(self.offer)
             p["inventory"].append(reward)
+            sync_item(p, reward, add=True)
             sp = SPECIAL_REWARDS.get(reward)
             if sp:
                 if sp["effect"]=="food+1": p["food"]+=1
@@ -230,16 +252,40 @@ class TradeView(discord.ui.View):
                 if sp["effect"]=="fuel+50": p["fuel"]+=50
                 if sp["effect"]=="fuel+100": p["fuel"]+=100
                 if sp["effect"]=="fuel_full": p["fuel"]=999
-                emb=discord.Embed(title=f"✨ {reward}", description=f"{sp['text']}\n\n{self.offer} -> {reward}", color=sp["color"])
+                emb=discord.Embed(title=f"✨ {reward}", description=f"{sp['text']}\n\n{self.offer} -> {reward}\n现在 食物{p['food']} 燃料{p['fuel']}", color=sp["color"])
                 if sp["image"]: emb.set_image(url=sp["image"])
-                await interaction.response.edit_message(embed=emb, view=None)
             else:
-                await interaction.response.edit_message(embed=discord.Embed(title=f"与 {self.npc_name} 交易", description=f"{self.offer} -> {reward}", color=ALL_NPCS[self.npc_name]["color"]), view=None)
+                emb=discord.Embed(title=f"与 {self.npc_name} 交易", description=f"{self.offer} -> {reward}\n现在 食物{p['food']} 燃料{p['fuel']}", color=ALL_NPCS[self.npc_name]["color"])
+            await interaction.response.edit_message(embed=emb, view=AgainTradeView(self.from_id, self.to_id, self.npc_name))
         else:
-            get_player(self.to_id)["inventory"].append(self.offer)
+            target = get_player(self.to_id)
+            target["inventory"].append(self.offer)
+            sync_item(target, self.offer, add=True)
             p["inventory"].remove(self.offer)
-            await interaction.response.edit_message(embed=discord.Embed(title="交易完成", description=f"{self.offer} 已给对方"), view=None)
+            await interaction.response.edit_message(embed=discord.Embed(title="交易完成", description=f"{self.offer} 已给对方\n你现在 食物{p['food']} 燃料{p['fuel']}"), view=AgainTradeView(self.from_id, self.to_id, self.npc_name))
         save_now()
+
+class AgainTradeView(discord.ui.View):
+    def __init__(self, from_id, to_id=None, npc_name=None):
+        super().__init__(timeout=120)
+        self.from_id = from_id
+        self.to_id = to_id
+        self.npc_name = npc_name
+    @discord.ui.button(label="🔄 重新交易", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def again(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.from_id:
+            await interaction.response.send_message("❌ 不是你的交易", ephemeral=True); return
+        p = get_player(self.from_id)
+        if not p["inventory"]:
+            await interaction.response.edit_message(embed=discord.Embed(title="背包空了", description="没东西可交易了", color=0x555555), view=None)
+            return
+        view = TradeView(self.from_id, self.to_id, self.npc_name, p["inventory"])
+        embed = discord.Embed(title=f"与 {self.npc_name} 交易 (重新)" if self.npc_name else "继续交易", description=f"现在 {p['km']}km | 食物{p['food']} 燃料{p['fuel']} | 共{len(p['inventory'])}件", color=ALL_NPCS[self.npc_name]["color"] if self.npc_name else 0x8b9a7d)
+        await interaction.response.edit_message(embed=embed, view=view)
+    @discord.ui.button(label="关闭", style=discord.ButtonStyle.secondary, emoji="✖️")
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.from_id: return
+        await interaction.response.edit_message(embed=discord.Embed(title="交易结束", description="旅途继续...", color=0x555555), view=None)
 
 class GiveItemView(discord.ui.View):
     def __init__(self, user_id):
@@ -251,11 +297,15 @@ class GiveItemView(discord.ui.View):
             self.sel2=discord.ui.Select(placeholder="选择物品26-更多", options=opts2, min_values=1, max_values=5); self.sel2.callback=self.cb2; self.add_item(self.sel2)
     async def cb1(self, interaction: discord.Interaction):
         if interaction.user.id!=self.user_id: return
-        p=get_player(self.user_id); p["inventory"].extend(self.sel1.values); save_now()
+        p=get_player(self.user_id); p["inventory"].extend(self.sel1.values); 
+        for it in self.sel1.values: sync_item(p, it, True)
+        save_now()
         await interaction.response.send_message(f"✅ 已给予：{', '.join(self.sel1.values)}", ephemeral=True)
     async def cb2(self, interaction: discord.Interaction):
         if interaction.user.id!=self.user_id: return
-        p=get_player(self.user_id); p["inventory"].extend(self.sel2.values); save_now()
+        p=get_player(self.user_id); p["inventory"].extend(self.sel2.values);
+        for it in self.sel2.values: sync_item(p, it, True)
+        save_now()
         await interaction.response.send_message(f"✅ 已给予：{', '.join(self.sel2.values)}", ephemeral=True)
 
 @bot.tree.command(name="开发者", description="开发者模式[仅限]")
@@ -291,16 +341,18 @@ async def 步行(interaction: discord.Interaction):
         return
     prev_km = data["km"]
     data["step"] += 1
-
     if not is_dev_now and data["fuel"] <= 0:
         move = random.randint(1, 2); data["km"] += move; low_fuel = True
     else:
         move = random.randint(3, 5); data["km"] += move; low_fuel = False
 
+    # 第二步飞机事件 - 带你给的图片
     if data["step"] == 2 and not data["visited_airplane"]:
         data["visited_airplane"] = True; data["food"] += 10
         data["inventory"].extend(["压缩口粮 x10", "生锈的仪表盘"]); save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="发现报废战斗机", description="获得：压缩口粮 x10", color=0x8b9a7d))
+        embed = discord.Embed(title="发现报废战斗机", description="尤莉：千户！这里有吃的！\n千户：...先确认一下有没有危险。\n\n获得：压缩口粮 x10", color=0x8b9a7d)
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565001787013079181/Screenshot_20261028_215740.jpg?ex=6ae350fe&is=6ae1ff7e&hm=05633f8ece6e2427381e954f716cd583f21d6475e1790309ffb16730fd534a6c&")
+        await interaction.response.send_message(embed=embed)
         return
 
     if not is_dev_now:
@@ -309,19 +361,12 @@ async def 步行(interaction: discord.Interaction):
             players.pop(interaction.user.id, None); save_now()
             await interaction.response.send_message(embed=discord.Embed(title="饿死了...", color=0x000000))
             return
-
     if data["km"] >= 1000 and not data["ended"]:
         data["ended"] = True; data["met_npcs"].add("上层的幽灵"); data["npc_met_km"]["上层的幽灵"]=data["km"]; data["inventory"].append("星空的照片"); save_now()
         embed = discord.Embed(title="—— 1000km，终点", description="……嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完", color=0x000000)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85&")
         await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id))
         return
-
-    if prev_km < 750 <= data["km"]:
-        save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="⚠️ 补给线断绝", description=f"已到达 {data['km']}km\n越接近上层，城市越干净...\n**从现在起，地上不会再生成食物和燃料**\n食物{data['food']} 燃料{data['fuel']}", color=0xff4444))
-        return
-
     if data["km"] < 750:
         force_met = []
         for name, nd in ALL_NPCS.items():
@@ -348,20 +393,16 @@ async def 步行(interaction: discord.Interaction):
                         color=nd["color"]
                     ))
                     return
-
     if data["km"] < 550:
         roll_type = random.choices(["空空", "食物", "杂物"], weights=[30, 45, 25])[0]
     else:
         roll_type = random.choices(["空空", "食物", "杂物"], weights=[45, 35, 20])[0]
-
     push_text = "\n\n⛽ 没燃料了，只能推着Kettenkrad走 (1-2km)" if low_fuel else ""
-
     if roll_type == "空空":
         save_now()
         embed = discord.Embed(title="空空", description=random.choice(["什么都没有...", "只有风声...", "空空如也", "尤莉：千户，好无聊啊~"]) + push_text, color=0x555555)
         embed.set_author(name=f"{data['km']}/1000km | Step {data['step']} | 食物{data['food']} 燃料{data['fuel']} | 本次+{move}km")
         await interaction.response.send_message(embed=embed); return
-
     if roll_type == "食物":
         if data["km"] >= 750 and not is_dev_now:
             save_now()
@@ -380,7 +421,6 @@ async def 步行(interaction: discord.Interaction):
         embed = discord.Embed(title="🍙 找到食物！" if "口粮" in food_item or "土豆" in food_item else "⛽ 找到燃料！", description=f"获得 **{food_item}**" + push_text, color=0x8b9a7d if "口粮" in food_item else 0xffaa00)
         embed.set_author(name=f"{data['km']}/1000km | Step {data['step']} | 食物{data['food']} 燃料{data['fuel']} | 本次+{move}km")
         await interaction.response.send_message(embed=embed); return
-
     if roll_type == "杂物":
         loot_pool = RANDOM_LOOT
         if data["km"] >= 750 and not is_dev_now:
@@ -393,7 +433,6 @@ async def 步行(interaction: discord.Interaction):
         embed = discord.Embed(title="在废墟里翻到了..." if "稀有" not in typ else "✨ 稀有！", description=f"获得 {item}" + push_text, color=0xffd700 if "稀有" in typ else 0xa9a9a9)
         embed.set_author(name=f"{data['km']}/1000km | Step {data['step']} | 食物{data['food']} 燃料{data['fuel']} | 本次+{move}km")
         await interaction.response.send_message(embed=embed); return
-
     save_now()
     embed = discord.Embed(title="空空", description="什么都没有..." + push_text, color=0x555555)
     embed.set_author(name=f"{data['km']}/1000km | Step {data['step']} | 食物{data['food']} 燃料{data['fuel']} | 本次+{move}km")
@@ -404,8 +443,7 @@ async def 背包(interaction: discord.Interaction):
     d=get_player(interaction.user.id)
     lines, _ = format_backpack(d["inventory"])
     text = "\n".join(lines) if lines else "空空如也"
-    if len(text) > 3500:
-        text = text[-3500:]
+    if len(text) > 3500: text = text[-3500:]
     embed = discord.Embed(title=f"{d['km']}/1000km 背包", description=text, color=0x8b9a7d)
     embed.set_footer(text=f"共{len(d['inventory'])}件 | 食物{d['food']} 燃料{d['fuel']}")
     await interaction.response.send_message(embed=embed)
@@ -425,23 +463,19 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
         if npc not in d["met_npcs"] and interaction.user.id not in dev_mode_users:
             await interaction.followup.send(f"❌ 你还没遇到过 {npc}", ephemeral=True)
             return
-        if interaction.user.id not in dev_mode_users:
+        if npc not in ["尤莉", "千户", "上层的幽灵"] and interaction.user.id not in dev_mode_users:
             met_at = d["npc_met_km"].get(npc, 0)
             dist = d["km"] - met_at
             if dist > 15:
-                await interaction.followup.send(embed=discord.Embed(
-                    title="❌ 他已经不在这里了",
-                    description=f"你在 {met_at}km 遇到 {npc}，现在已经 {d['km']}km，离开了 {dist}km。",
-                    color=0x555555
-                ), ephemeral=True)
+                await interaction.followup.send(embed=discord.Embed(title="❌ 他已经不在这里了", description=f"你在 {met_at}km 遇到 {npc}，现在已经 {d['km']}km，离开了 {dist}km。", color=0x555555), ephemeral=True)
                 return
         view = TradeView(interaction.user.id, npc_name=npc, inventory=d["inventory"])
         met_at = d["npc_met_km"].get(npc, 0)
-        await interaction.followup.send(embed=discord.Embed(
-            title=f"与 {npc} 交易", 
-            description=f"在 {met_at}km 遇到，现在 {d['km']}km (距离 {d['km']-met_at}km)\n还能交易 {15-(d['km']-met_at)}km",
-            color=ALL_NPCS[npc]["color"]
-        ), view=view, ephemeral=True)
+        if npc in ["尤莉", "千户"]:
+            desc = f"她一直和你在一起 (现在 {d['km']}km)\n随时可以交易 | 食物{d['food']} 燃料{d['fuel']}"
+        else:
+            desc = f"在 {met_at}km 遇到，现在 {d['km']}km (距离 {d['km']-met_at}km)\n还能交易 {15-(d['km']-met_at)}km | 食物{d['food']} 燃料{d['fuel']}"
+        await interaction.followup.send(embed=discord.Embed(title=f"与 {npc} 交易", description=desc, color=ALL_NPCS[npc]["color"]), view=view, ephemeral=True)
     else:
         if 用户.id == interaction.user.id:
             await interaction.followup.send("❌ 不能跟自己交易", ephemeral=True); return
@@ -462,7 +496,7 @@ async def 图鉴(interaction: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Bot 上线 v17.5 - 背包合并")
+    print("Bot 上线 v17.9 - 带飞机图")
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
