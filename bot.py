@@ -244,7 +244,7 @@ async def 步行(interaction: discord.Interaction):
         embed = discord.Embed(title="—— 1000km，终点", description="……嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完", color=0x000000)
         try:
             file = discord.File("https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85&", filename="ending.jpg")
-            embed.set_image(url="attachment://ending.jpg")
+            embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c87819")
             await interaction.response.send_message(embed=embed, file=file)
         except Exception as e:
             print(f"[IMG] https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85& 没找到: {e}")
