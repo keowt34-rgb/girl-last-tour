@@ -21,6 +21,7 @@ def load_save():
                 data = json.load(f)
                 for uid, pdata in data.get("players", {}).items():
                     pdata["met_npcs"] = set(pdata.get("met_npcs", ["千户","尤莉"]))
+                    pdata["ever_met"] = set(pdata.get("ever_met", list(pdata["met_npcs"])))
                     pdata["npc_met_km"] = pdata.get("npc_met_km", {"千户":0,"尤莉":0})
                     players[int(uid)] = pdata
                 dev_mode_users = set(data.get("dev_mode_users", []))
@@ -30,7 +31,7 @@ def load_save():
 def save_now():
     try:
         save_data = {
-            "players": {uid: {**pdata, "met_npcs": list(pdata["met_npcs"])} for uid, pdata in players.items()},
+            "players": {uid: {**pdata, "met_npcs": list(pdata["met_npcs"]), "ever_met": list(pdata.get("ever_met", []))} for uid, pdata in players.items()},
             "dev_mode_users": list(dev_mode_users)
         }
         with open(SAVE_FILE, "w", encoding="utf-8") as f:
@@ -49,10 +50,7 @@ def format_backpack(inventory):
     lines = []
     for name in seen:
         c = counter[name]
-        if c > 1:
-            lines.append(f"{name} x{c}")
-        else:
-            lines.append(name)
+        lines.append(f"{name} x{c}" if c > 1 else name)
     return lines, counter
 
 def get_unique_for_trade(inventory):
@@ -65,15 +63,13 @@ def get_unique_for_trade(inventory):
 def get_food_value(name):
     if "压缩口粮 x10" in name or "军用口粮 x10" in name: return 10
     if "土豆干 x2" in name: return 2
-    if "压缩口粮 x1" in name: return 1
-    if name == "土豆干": return 1
+    if "压缩口粮 x1" in name or name == "土豆干": return 1
     if "土豆干 x10" in name: return 10
     return 0
 
 def get_fuel_value(name):
     if "燃料桶 x20" in name: return 20
-    if "燃料桶(半满)" in name: return 5
-    if name == "燃料桶": return 5
+    if "燃料桶(半满)" in name or name == "燃料桶": return 5
     return 0
 
 def sync_item(p, item_name, add=True):
@@ -86,7 +82,7 @@ def sync_item(p, item_name, add=True):
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v19.3 FIX | {len(players)}人 {total}km"
+    return f"Kettenkrad v19.4 | {len(players)}人 {total}km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -107,9 +103,6 @@ SPECIAL_REWARDS = {
     "电能 x100": {"text": "努可：努可！ (释放100电能)", "image": None, "color": 0xffffff, "effect": "fuel+100"},
     "星空的照片": {"text": "……嗯。\n\n千户：...好美。", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae330b7&is=6ae1df37&hm=8553fc19adecb9faf90bf90e5eb82dd40857b36c06b75a47853e4ab9210ad731&", "color": 0x000000, "effect": "END"},
     "END标记": {"text": "上面什么都没有了。\n但旅途本身，就是意义。\n—— 少女终末旅行 完", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564980687608483930/Screenshot_20261028_203421.jpg?ex=6ae33d57&is=6ae1ebd7&hm=a8b27dcf5f82a7523ca141181444084e539a67e11c5a56fb4fc598dbfb5d1dd8&", "color": 0x000000, "effect": "END"},
-    "小地藏雕像": {"text": "石像爷爷：保佑你们的旅途。", "image": None, "color": 0xa9a9a9, "effect": "none"},
-    "飞机设计图": {"text": "石井：这架飞机本来想去上层的", "image": None, "color": 0xdeb887, "effect": "none"},
-    "世界地图(残缺)": {"text": "金泽：这地图我画了半辈子", "image": None, "color": 0x87ceeb, "effect": "none"},
 }
 
 NPC_DIALOGUE = {
@@ -144,11 +137,11 @@ DROP_TABLE = {
 
 RANDOM_LOOT = [
     ("生锈的螺栓", 15, "尤莉：这是什么？能吃吗？\n千户：不能"), 
-    ("空罐头", 15, "尤莉：空的...什么都没有"),
+    ("空罐头", 15, "尤莉：空的..."),
     ("旧报纸", 10, "千户：...都是几百年前的新闻了"),
-    ("破布", 8, "尤莉：破的...不能当毛毯了"), 
+    ("破布", 8, "尤莉：破的..."), 
     ("发光的石头", 2, "尤莉：哇！会发光！"),
-    ("38式步枪子弹 x5", 7, "尤莉：子弹！\n千户：...38式的，已经不能用了"),
+    ("38式步枪子弹 x5", 7, "尤莉：子弹！"),
 ]
 
 ALL_ITEMS_POOL = [
@@ -172,12 +165,14 @@ def get_player(uid):
             "km":0,"food":2,"fuel":28,"step":0,"visited_airplane":False,"ended":False,
             "bike_scrapped":False,"bath_to_delete":False,"endless":False,
             "met_npcs":set(["千户","尤莉"]),
+            "ever_met":set(["千户","尤莉"]),
             "npc_met_km":{"千户":0,"尤莉":0},
             "inventory":["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
         }
         save_now()
     for k,v in [("bike_scrapped",False),("bath_to_delete",False),("endless",False)]:
         if k not in players[uid]: players[uid][k]=v
+    if "ever_met" not in players[uid]: players[uid]["ever_met"] = set(players[uid]["met_npcs"])
     if "npc_met_km" not in players[uid]: players[uid]["npc_met_km"] = {}
     return players[uid]
 
@@ -196,22 +191,24 @@ class EndlessConfirmView(discord.ui.View):
                 "visited_airplane": False, "ended": False,
                 "bike_scrapped": False, "bath_to_delete": False, "endless": True,
                 "met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
+                "ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
                 "npc_met_km": {"千户":0,"尤莉":0},
                 "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"]
             }
             save_now()
-            await interaction.response.edit_message(embed=discord.Embed(title="♾️ 无尽模式 已开启", description="普通进度已清除。\n初始6食物38燃料 / 0km", color=0x00ffaa), view=None)
+            await interaction.response.edit_message(embed=discord.Embed(title="♾️ 无尽模式 已开启", description="普通进度已清除。6食物38燃料 / 0km", color=0x00ffaa), view=None)
         else:
             players[interaction.user.id] = {
                 "km": 0, "food": 2, "fuel": 28, "step": 0,
                 "visited_airplane": False, "ended": False,
                 "bike_scrapped": False, "bath_to_delete": False, "endless": False,
                 "met_npcs": set(["千户","尤莉"]),
+                "ever_met": set(["千户","尤莉"]),
                 "npc_met_km": {"千户":0,"尤莉":0},
                 "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
             }
             save_now()
-            await interaction.response.edit_message(embed=discord.Embed(title="返回普通模式", description="无尽进度已清除\n2食物28燃料", color=0x8b9a7d), view=None)
+            await interaction.response.edit_message(embed=discord.Embed(title="返回普通模式", description="无尽进度已清除", color=0x8b9a7d), view=None)
     @discord.ui.button(label="取消", style=discord.ButtonStyle.secondary, emoji="✖️")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
@@ -228,6 +225,7 @@ class RestartView(discord.ui.View):
             "visited_airplane": False, "ended": False,
             "bike_scrapped": False,"bath_to_delete": False,"endless": False,
             "met_npcs": set(["千户","尤莉"]),
+            "ever_met": set(["千户","尤莉"]),
             "npc_met_km": {"千户":0,"尤莉":0},
             "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
         }
@@ -247,7 +245,7 @@ class TradeView(discord.ui.View):
             cnt = counter[item]
             label = f"{item} (x{cnt})" if cnt > 1 else item
             opts.append(discord.SelectOption(label=label[:100], value=f"{idx}|{item}"))
-        self.select_give = discord.ui.Select(placeholder=f"选择物品 - 共{len(inv)}件 {len(unique)}种", min_values=1, max_values=1, options=opts)
+        self.select_give = discord.ui.Select(placeholder=f"选择物品 - 共{len(inv)}件", min_values=1, max_values=1, options=opts)
         self.select_give.callback = self.select_callback
         self.add_item(self.select_give)
     async def select_callback(self, interaction: discord.Interaction):
@@ -293,7 +291,8 @@ async def 开发者(interaction: discord.Interaction):
         dev_mode_users.remove(interaction.user.id); await interaction.response.send_message(embed=discord.Embed(title="DEV 已关闭", color=0xff0000))
     else:
         dev_mode_users.add(interaction.user.id); d=get_player(interaction.user.id); 
-        for k in ALL_NPCS.keys(): d["met_npcs"].add(k); d["npc_met_km"][k]=d["km"]
+        for k in ALL_NPCS.keys(): 
+            d["met_npcs"].add(k); d["ever_met"].add(k); d["npc_met_km"][k]=d["km"]
         await interaction.response.send_message(embed=discord.Embed(title="DEV 已开启", color=0xffd700))
     save_now()
 
@@ -331,13 +330,11 @@ async def 步行(interaction: discord.Interaction):
     prev_km = data["km"]
 
     if not is_endless:
-        expired = []
         for npc_name in list(data["met_npcs"]):
             if npc_name in ["千户","尤莉"]: continue
             met_km = data["npc_met_km"].get(npc_name, 0)
             if data["km"] - met_km > 15:
                 data["met_npcs"].discard(npc_name)
-                expired.append(npc_name)
 
     data["step"] += 1
     has_bike = any("Kettenkrad" in i or "履带摩托" in i for i in data["inventory"])
@@ -378,6 +375,7 @@ async def 步行(interaction: discord.Interaction):
                     "visited_airplane": False, "ended": False,
                     "bike_scrapped": False, "bath_to_delete": False, "endless": True,
                     "met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
+                    "ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
                     "npc_met_km": {"千户":0,"尤莉":0},
                     "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"]
                 }
@@ -389,6 +387,7 @@ async def 步行(interaction: discord.Interaction):
                     "visited_airplane": False, "ended": False,
                     "bike_scrapped": False, "bath_to_delete": False, "endless": False,
                     "met_npcs": set(["千户","尤莉"]),
+                    "ever_met": set(["千户","尤莉"]),
                     "npc_met_km": {"千户":0,"尤莉":0},
                     "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
                 }
@@ -409,7 +408,7 @@ async def 步行(interaction: discord.Interaction):
             if "Kettenkrad" in data["inventory"][i] or "履带摩托" in data["inventory"][i]:
                 del data["inventory"][i]; break
         data["inventory"].append("Kettenkrad浴缸"); save_now()
-        embed = discord.Embed(title="💥 Kettenkrad 报废 - 850km", description="嘎吱...砰。\n\n千户：...不动了。\n尤莉：修一下就好了吧？\n千户：...履带断了，引擎也烧死了。修不了了。\n\n—— Kettenkrad报废了\n获得：Kettenkrad浴缸", color=0x555555)
+        embed = discord.Embed(title="💥 Kettenkrad 报废 - 850km", description="嘎吱...砰。\n\n千户：...不动了。\n—— Kettenkrad报废了\n获得：Kettenkrad浴缸", color=0x555555)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565030660282912889/082.jpg.webp?ex=6ae36be2&is=6ae21a62&hm=53dcefc67ca4022ed391d055e673eb9cbc707d0c9e659f326b9e95bd2d257c4b&")
         await interaction.response.send_message(embed=embed); return
 
@@ -428,8 +427,9 @@ async def 步行(interaction: discord.Interaction):
         force_met = []
         for name, nd in ALL_NPCS.items():
             if name in ["上层的幽灵","千户","尤莉"]: continue
-            if name not in data["met_npcs"] and data["km"] >= nd["km_need"]:
+            if name not in data["met_npcs"] and name not in data.get("ever_met", set()) and data["km"] >= nd["km_need"]:
                 data["met_npcs"].add(name)
+                data["ever_met"].add(name)
                 data["npc_met_km"][name]=data["km"]
                 force_met.append(name)
         if force_met:
@@ -440,9 +440,9 @@ async def 步行(interaction: discord.Interaction):
 
         if random.random() < 0.12:
             if random.random() < 0.5:
-                embed = discord.Embed(title=f"{data['km']}km - 尤莉", description=random.choice(["尤莉：千户，好饿啊~","尤莉：我想吃鱼！"]), color=0xf2c17c)
+                embed = discord.Embed(title=f"{data['km']}km - 尤莉", description="尤莉：千户，好饿啊~", color=0xf2c17c)
             else:
-                embed = discord.Embed(title=f"{data['km']}km - 千户", description=random.choice(["千户：尤莉，别乱开枪","千户：这本书上说..."]), color=0x8b9a7d)
+                embed = discord.Embed(title=f"{data['km']}km - 千户", description="千户：尤莉，别乱开枪", color=0x8b9a7d)
             embed.set_author(name=f"{data['km']}km | 食物{data['food']} 燃料{data['fuel']} | +{move}km")
             save_now()
             await interaction.response.send_message(embed=embed); return
@@ -507,7 +507,7 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Bot 上线 v19.3 FIX")
+    print("Bot 上线 v19.4 FIX REPEAT")
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
