@@ -232,11 +232,19 @@ async def 步行(interaction: discord.Interaction):
             players.pop(interaction.user.id, None); save_now()
             await interaction.response.send_message(embed=discord.Embed(title="饿死了...", color=0x000000)); return
 
-    if data["km"]>=1000 and not data["ended"]:
+        if data["km"]>=1000 and not data["ended"]:
         data["ended"]=True; data["met_npcs"].add("上层的幽灵"); data["inventory"].append("星空的照片"); save_now()
-        embed=discord.Embed(title="—— 1000km，终点", description="千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 完", color=0x000000)
-        embed.set_image(url="https://i.imgur.com/wQSkR6p.jpeg")
-        await interaction.response.send_message(embed=embed); return
+        embed=discord.Embed(title="—— 1000km，终点", description="……嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完", color=0x000000)
+        # 原作图片写死本地，永久不走外链
+        try:
+            file = discord.File("ending.jpg", filename="ending.jpg")
+            embed.set_image(url="attachment://ending.jpg")
+            await interaction.response.send_message(embed=embed, file=file)
+        except Exception as e:
+            print(f"[IMG] ending.jpg 没找到: {e}")
+            # 没图也发文字，不会报错
+            await interaction.response.send_message(embed=embed)
+        return
 
     if prev_km < 750 <= data["km"]:
         save_now()
