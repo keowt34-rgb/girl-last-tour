@@ -41,7 +41,7 @@ load_save()
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v15.5-discordapp | {len(players)}人 {total}km"
+    return f"Kettenkrad v15.6 | {len(players)}人 {total}km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -50,7 +50,6 @@ def run_flask():
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# ===== 特殊奖励 - discordapp外链版，不用File() =====
 SPECIAL_REWARDS = {
     "尤莉的笑脸": {"text": "尤莉：嘿嘿~ 千户你看我笑得可爱吗？\n千户：...笨蛋。", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967112982663238/44b80e01a3f2b3cb9d0bb35479393411.jpg?ex=6ae330b3&is=6ae1df33&hm=f0847625bf118e334badacf391241518b4bbcc611c24ba28d41bc2febedd04f2&", "color": 0xf2c17c, "effect": "food+1"},
     "尤莉的歌声": {"text": "尤莉：♪~ 拉拉拉~ 终末世界也要唱歌！", "image": None, "color": 0xf2c17c, "effect": "fuel+2"},
@@ -117,6 +116,41 @@ def get_player(uid):
         players[uid] = {"km":0,"food":2,"fuel":8,"step":0,"visited_airplane":False,"ended":False,"met_npcs":set(["千户","尤莉"]),"inventory":["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]}
         save_now()
     return players[uid]
+
+# ===== 新增：1000km终点双按钮 =====
+class RestartView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+
+    @discord.ui.button(label="重新开始", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ 这不是你的终点", ephemeral=True)
+            return
+        # 全部重置
+        players[interaction.user.id] = {
+            "km": 0, "food": 2, "fuel": 8, "step": 0,
+            "visited_airplane": False, "ended": False,
+            "met_npcs": set(["千户","尤莉"]),
+            "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
+        }
+        save_now()
+        await interaction.response.edit_message(embed=discord.Embed(
+            title="🔄 旅途重新开始",
+            description="一切回到了起点。\n0km / 1000km\n\n背包、进度、图鉴已全部重置。\n\n千户：...又要重新记录了。\n尤莉：好耶！再来一次冒险！",
+            color=0x8b9a7d
+        ), view=None)
+
+    @discord.ui.button(label="留在终点", style=discord.ButtonStyle.secondary, emoji="⭐")
+    async def stay(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return
+        await interaction.response.edit_message(embed=discord.Embed(
+            title="—— 留在星空下",
+            description="……嗯。\n你们选择留在1000km，仰望星空。\n想重来的时候，还可以点 `重新开始`。",
+            color=0x000000
+        ), view=self)
 
 class TradeView(discord.ui.View):
     def __init__(self, from_id, to_id=None, npc_name=None):
@@ -206,7 +240,10 @@ async def 步行(interaction: discord.Interaction):
     data = get_player(interaction.user.id)
     is_dev_now = interaction.user.id in dev_mode_users
     if data["ended"] and not is_dev_now:
-        await interaction.response.send_message("旅途已结束...", ephemeral=True)
+        # 已经在终点，重新给按钮
+        embed = discord.Embed(title="—— 1000km，终点", description="你们已经在终点了。\n要重新开始吗？", color=0x000000)
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85&")
+        await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id), ephemeral=True)
         return
     prev_km = data["km"]
     data["step"] += 1
@@ -236,7 +273,7 @@ async def 步行(interaction: discord.Interaction):
         save_now()
         embed = discord.Embed(title="—— 1000km，终点", description="……嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完", color=0x000000)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85&")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id))
         return
 
     if prev_km < 750 <= data["km"]:
@@ -344,7 +381,7 @@ async def 图鉴(interaction: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Bot 上线 v15.5 - discordapp外链版")
+    print("Bot 上线 v15.6 - 终点双按钮版")
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
