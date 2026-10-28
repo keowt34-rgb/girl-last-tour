@@ -225,7 +225,9 @@ async def 步行(interaction: discord.Interaction):
         await interaction.response.send_message(embed=discord.Embed(title="发现报废战斗机", description="获得：压缩口粮 x10", color=0x8b9a7d)); return
 
     if not is_dev_now:
-        data["food"]-=1; data["fuel"]-=1
+        data["food"]-=1
+        # 燃料耗尽维持0，不会变负数
+        data["fuel"] = max(0, data["fuel"] - 1)
         if data["food"]<=0:
             players.pop(interaction.user.id, None); save_now()
             await interaction.response.send_message(embed=discord.Embed(title="饿死了...", color=0x000000)); return
@@ -236,19 +238,34 @@ async def 步行(interaction: discord.Interaction):
         embed.set_image(url="https://i.imgur.com/wQSkR6p.jpeg")
         await interaction.response.send_message(embed=embed); return
 
-    # 750km提示
     if prev_km < 750 <= data["km"]:
         save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="⚠️ 补给线断绝", description=f"已到达 {data['km']}km\n越接近上层，城市越干净，食物燃料几乎没有了...\n**从现在起，地上不会再生成食物和燃料**\n请检查背包：食物{data['food']} 燃料{data['fuel']}\n\n*开发者不受影响*", color=0xff4444))
+        await interaction.response.send_message(embed=discord.Embed(title="⚠️ 补给线断绝", description=f"已到达 {data['km']}km\n越接近上层，城市越干净，食物燃料几乎没有了...\n**从现在起，地上不会再生成食物和燃料**\n请检查背包：食物{data['food']} 燃料{data['fuel']}\n*开发者不受影响*", color=0xff4444))
         return
 
-    for name,nd in ALL_NPCS.items():
-        if name not in data["met_npcs"] and data["km"]>=nd["km_need"] and name!="上层的幽灵":
-            if random.random()<0.35 or is_dev_now:
-                data["met_npcs"].add(name); save_now()
-                await interaction.response.send_message(embed=discord.Embed(title=f"遇到了 {name}！", color=nd["color"])); return
+    # ===== 750km以下强制遇光全部NPC，除了上层的幽灵 =====
+    if data["km"] < 750:
+        force_met = []
+        for name, nd in ALL_NPCS.items():
+            if name == "上层的幽灵":
+                continue
+            if name not in data["met_npcs"] and data["km"] >= nd["km_need"]:
+                data["met_npcs"].add(name)
+                force_met.append(name)
+        if force_met:
+            save_now()
+            desc = "\n".join([f"遇到了 {n}！" for n in force_met])
+            await interaction.response.send_message(embed=discord.Embed(title=f"📍 发现 {len(force_met)} 个旅人", description=desc, color=0xffd700))
+            return
+    else:
+        # 750以上还是随机遇
+        for name,nd in ALL_NPCS.items():
+            if name not in data["met_npcs"] and data["km"]>=nd["km_need"] and name!="上层的幽灵":
+                if random.random()<0.35 or is_dev_now:
+                    data["met_npcs"].add(name); save_now()
+                    await interaction.response.send_message(embed=discord.Embed(title=f"遇到了 {name}！", color=nd["color"])); return
 
-        # ===== 新机率：空空40 食物40 杂物20 =====
+    # ===== 新机率：空空40 食物40 杂物20 =====
     roll_type = random.choices(["空空","食物","杂物"], weights=[40,40,20])[0]
 
     if roll_type == "空空":
@@ -259,7 +276,6 @@ async def 步行(interaction: discord.Interaction):
         return
 
     if roll_type == "食物":
-        # 750km后食物不出了，自动变空空
         if data["km"] >= 750 and not is_dev_now:
             save_now()
             await interaction.response.send_message(embed=discord.Embed(title="空空", description="真正的上层，什么都没有...只有风\n*750km后已无补给*", color=0x111111))
@@ -285,6 +301,7 @@ async def 步行(interaction: discord.Interaction):
         data["inventory"].append(item)
         if "食物+" in typ and not is_dev_now: data["food"]+=int(typ.split("+")[1])
         if "燃料+" in typ and not is_dev_now: data["fuel"]+=int(typ.split("+")[1])
+        data["fuel"] = max(0, data["fuel"])
         save_now()
         embed=discord.Embed(title="在废墟里翻到了..." if "稀有" not in typ else "✨ 稀有！", description=f"获得 {item}", color=0xffd700 if "稀有" in typ else 0xa9a9a9)
         extra = " | 最后250km 无补给" if data["km"]>=750 and not is_dev_now else ""
