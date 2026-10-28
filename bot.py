@@ -248,23 +248,50 @@ async def 步行(interaction: discord.Interaction):
                 data["met_npcs"].add(name); save_now()
                 await interaction.response.send_message(embed=discord.Embed(title=f"遇到了 {name}！", color=nd["color"])); return
 
-    if random.random()<0.4:
+        # ===== 新机率：空空40 食物40 杂物20 =====
+    roll_type = random.choices(["空空","食物","杂物"], weights=[40,40,20])[0]
+
+    if roll_type == "空空":
+        save_now()
+        embed=discord.Embed(title="空空", description=random.choice(["什么都没有...","只有风声...","空空如也","尤莉：千户，好无聊啊~"]), color=0x555555)
+        embed.set_author(name=f"{data['km']}/1000km | Step {data['step']} | 食物{data['food']} 燃料{data['fuel']}")
+        await interaction.response.send_message(embed=embed)
+        return
+
+    if roll_type == "食物":
+        # 750km后食物不出了，自动变空空
+        if data["km"] >= 750 and not is_dev_now:
+            save_now()
+            await interaction.response.send_message(embed=discord.Embed(title="空空", description="真正的上层，什么都没有...只有风\n*750km后已无补给*", color=0x111111))
+            return
+        food_item = random.choice(["压缩口粮 x1","土豆干 x2","压缩口粮 x10","军用口粮 x10","燃料桶(半满)"])
+        data["inventory"].append(food_item)
+        if "口粮" in food_item or "土豆" in food_item:
+            add = 10 if "x10" in food_item else (2 if "x2" in food_item else 1)
+            data["food"] += add
+        if "燃料" in food_item:
+            data["fuel"] += 5
+        save_now()
+        embed=discord.Embed(title="🍙 找到食物！", description=f"获得 **{food_item}**", color=0x8b9a7d)
+        embed.set_author(name=f"{data['km']}/1000km | Step {data['step']} | 食物{data['food']} 燃料{data['fuel']}")
+        await interaction.response.send_message(embed=embed)
+        return
+
+    if roll_type == "杂物":
         loot_pool = RANDOM_LOOT
         if data["km"] >= 750 and not is_dev_now:
             loot_pool = [x for x in RANDOM_LOOT if "食物" not in x[2] and "燃料" not in x[2]]
-            if not loot_pool:
-                save_now()
-                await interaction.response.send_message(embed=discord.Embed(title="空空", description="真正的上层，什么都没有...只有风", color=0x111111)); return
         item,_,typ = random.choices(loot_pool, weights=[w for _,w,_ in loot_pool])[0]
         data["inventory"].append(item)
         if "食物+" in typ and not is_dev_now: data["food"]+=int(typ.split("+")[1])
         if "燃料+" in typ and not is_dev_now: data["fuel"]+=int(typ.split("+")[1])
         save_now()
-        embed=discord.Embed(title="在废墟里翻到了..." if "稀有" not in typ else "✨ 稀有！", description=f"获得 {item}", color=0xffd700 if "稀有" in typ else 0x8b9a7d)
+        embed=discord.Embed(title="在废墟里翻到了..." if "稀有" not in typ else "✨ 稀有！", description=f"获得 {item}", color=0xffd700 if "稀有" in typ else 0xa9a9a9)
         extra = " | 最后250km 无补给" if data["km"]>=750 and not is_dev_now else ""
         embed.set_author(name=f"{data['km']}/1000km | Step {data['step']}{extra} | 食物{data['food']} 燃料{data['fuel']}")
-        await interaction.response.send_message(embed=embed); return
-
+        await interaction.response.send_message(embed=embed)
+        return
+        
     save_now()
     embed=discord.Embed(title="空空", description=random.choice(["什么都没有...","只有风声...","空空如也"]), color=0x555555)
     embed.set_author(name=f"{data['km']}/1000km | Step {data['step']} | 食物{data['food']} 燃料{data['fuel']}")
