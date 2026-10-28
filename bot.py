@@ -42,7 +42,7 @@ load_save()
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v17.0 Final | {len(players)}人 {total}km"
+    return f"Kettenkrad v17.3 | {len(players)}人 {total}km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -90,7 +90,6 @@ DROP_TABLE = {
     "上层的幽灵": [("星空的照片", 50), ("END标记", 50)],
 }
 
-# 燃料=食物 50/50
 RANDOM_LOOT = [
     ("生锈的螺栓", 15, "垃圾"), ("空罐头", 15, "垃圾"), ("旧报纸", 10, "垃圾"),
     ("破布", 8, "垃圾"), 
@@ -173,7 +172,8 @@ class TradeView(discord.ui.View):
             await interaction.response.send_message("❌ 不是你的交易", ephemeral=True)
             return
         self.offer = self.select_give.values[0]
-        await interaction.response.send_message(f"已选择：**{self.offer}** ，点下方 ✅确认 交易", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(f"已选择：**{self.offer}** ，点下方 ✅确认 交易", ephemeral=True)
 
     @discord.ui.button(label="确认交易", style=discord.ButtonStyle.success, emoji="🤝")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -264,7 +264,7 @@ async def 步行(interaction: discord.Interaction):
     if not is_dev_now and data["fuel"] <= 0:
         move = random.randint(1, 2); data["km"] += move; low_fuel = True
     else:
-        move = random.randint(3, 7); data["km"] += move; low_fuel = False
+        move = random.randint(3, 5); data["km"] += move; low_fuel = False
 
     if data["step"] == 2 and not data["visited_airplane"]:
         data["visited_airplane"] = True; data["food"] += 10
@@ -376,22 +376,23 @@ async def 背包(interaction: discord.Interaction):
 @bot.tree.command(name="交易", description="交易")
 @discord.app_commands.choices(npc=[discord.app_commands.Choice(name=k, value=k) for k in ALL_NPCS.keys()])
 async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, npc: str=None):
+    await interaction.response.defer(ephemeral=True)
     if not 用户 and not npc:
-        await interaction.response.send_message("用法：/交易 用户:@xxx 或 /交易 npc:金泽", ephemeral=True)
+        await interaction.followup.send("用法：/交易 用户:@xxx 或 /交易 npc:金泽", ephemeral=True)
         return
     d=get_player(interaction.user.id)
     if not d["inventory"]:
-        await interaction.response.send_message("❌ 背包空的", ephemeral=True)
+        await interaction.followup.send("❌ 背包空的", ephemeral=True)
         return
     if npc:
         if npc not in d["met_npcs"] and interaction.user.id not in dev_mode_users:
-            await interaction.response.send_message(f"❌ 你还没遇到过 {npc}", ephemeral=True)
+            await interaction.followup.send(f"❌ 你还没遇到过 {npc}", ephemeral=True)
             return
         if interaction.user.id not in dev_mode_users:
             met_at = d["npc_met_km"].get(npc, 0)
             dist = d["km"] - met_at
             if dist > 15:
-                await interaction.response.send_message(embed=discord.Embed(
+                await interaction.followup.send(embed=discord.Embed(
                     title="❌ 他已经不在这里了",
                     description=f"你在 {met_at}km 遇到 {npc}，现在已经 {d['km']}km，离开了 {dist}km。\n\n他已经继续自己的旅途了...",
                     color=0x555555
@@ -399,16 +400,16 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
                 return
         view = TradeView(interaction.user.id, npc_name=npc, inventory=d["inventory"])
         met_at = d["npc_met_km"].get(npc, 0)
-        await interaction.response.send_message(embed=discord.Embed(
+        await interaction.followup.send(embed=discord.Embed(
             title=f"与 {npc} 交易", 
             description=f"在 {met_at}km 遇到，现在 {d['km']}km (距离 {d['km']-met_at}km)\n还能交易 {15-(d['km']-met_at)}km",
             color=ALL_NPCS[npc]["color"]
-        ), view=view)
+        ), view=view, ephemeral=True)
     else:
         if 用户.id == interaction.user.id:
-            await interaction.response.send_message("❌ 不能跟自己交易", ephemeral=True); return
+            await interaction.followup.send("❌ 不能跟自己交易", ephemeral=True); return
         view = TradeView(interaction.user.id, to_id=用户.id, inventory=d["inventory"])
-        await interaction.response.send_message(f"{用户.mention} 收到一个交易请求", embed=discord.Embed(title="玩家交易"), view=view)
+        await interaction.followup.send(f"{用户.mention} 收到一个交易请求", embed=discord.Embed(title="玩家交易"), view=view, ephemeral=True)
 
 @bot.tree.command(name="图鉴", description="图鉴")
 async def 图鉴(interaction: discord.Interaction):
@@ -424,7 +425,7 @@ async def 图鉴(interaction: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Bot 上线 v17.0 Final")
+    print("Bot 上线 v17.3 - 3-5km最终版")
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
