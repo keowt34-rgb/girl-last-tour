@@ -49,7 +49,7 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 intents = discord.Intents.default()
-bot = commands.Bot(intents=intents)
+bot = commands.Bot(command_prefix="/", intents=intents)
 
 # ===== 特殊奖励全量 =====
 SPECIAL_REWARDS = {
