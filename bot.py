@@ -86,7 +86,7 @@ def sync_item(p, item_name, add=True):
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v19.0 850NewImg | {len(players)}人 {total}km"
+    return f"Kettenkrad v19.1 DeathFix | {len(players)}人 {total}km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -133,15 +133,6 @@ DROP_TABLE = {
     "努可": [("发光的努可", 20), ("电能 x100", 50), ("被吃掉的子弹", 30)],
     "上层的幽灵": [("星空的照片", 50), ("END标记", 50)],
 }
-
-RANDOM_LOOT = [
-    ("生锈的螺栓", 15, "垃圾"), ("空罐头", 15, "垃圾"), ("旧报纸", 10, "垃圾"),
-    ("破布", 8, "垃圾"), 
-    ("燃料桶(半满)", 18, "燃料+5"), ("燃料桶 x20", 9, "燃料+20"),
-    ("压缩口粮 x1", 14, "食物+1"), ("土豆干 x2", 13, "食物+2"),
-    ("尤莉的笑脸", 1, "稀有"), ("小地藏雕像", 2, "稀有"),
-    ("发光的石头", 2, "垃圾"), ("38式步枪子弹 x5", 7, "垃圾"),
-]
 
 ALL_ITEMS_POOL = [
     "压缩口粮 x10", "压缩口粮 x1", "土豆干", "土豆干 x2", "军用口粮 x10", "燃料桶 x20", "燃料桶(半满)",
@@ -192,7 +183,7 @@ class EndlessConfirmView(discord.ui.View):
                 "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"]
             }
             save_now()
-            await interaction.response.edit_message(embed=discord.Embed(title="♾️ 无尽模式 已开启", description="你当前的普通进度已清除。\n\n**无尽模式：**\n- 永不报废\n- 每150km提示\n- 4-7km速度\n- 初始6食物38燃料，会饿死", color=0x00ffaa), view=None)
+            await interaction.response.edit_message(embed=discord.Embed(title="♾️ 无尽模式 已开启", description="普通进度已清除。\n初始6食物38燃料 / 0km", color=0x00ffaa), view=None)
         else:
             players[interaction.user.id] = {
                 "km": 0, "food": 2, "fuel": 28, "step": 0,
@@ -203,7 +194,7 @@ class EndlessConfirmView(discord.ui.View):
                 "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
             }
             save_now()
-            await interaction.response.edit_message(embed=discord.Embed(title="返回普通模式", description="无尽进度已清除，回到0km普通旅途。\n普通：2食物28燃料", color=0x8b9a7d), view=None)
+            await interaction.response.edit_message(embed=discord.Embed(title="返回普通模式", description="无尽进度已清除，回到0km普通旅途。\n2食物28燃料", color=0x8b9a7d), view=None)
     @discord.ui.button(label="取消", style=discord.ButtonStyle.secondary, emoji="✖️")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
@@ -349,12 +340,35 @@ async def 步行(interaction: discord.Interaction):
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565001787013079181/Screenshot_20261028_215740.jpg?ex=6ae350fe&is=6ae1ff7e&hm=05633f8ece6e2427381e954f716cd583f21d6475e1790309ffb16730fd534a6c&")
         await interaction.response.send_message(embed=embed); return
 
+    # --- 死亡分流修复 ---
     if not is_dev_now:
         data["food"] -= 1
         if has_bike: data["fuel"] = max(0, data["fuel"] - 1)
         if data["food"] <= 0:
-            players.pop(interaction.user.id, None); save_now()
-            await interaction.response.send_message(embed=discord.Embed(title="饿死了..." + (" (无尽结束)" if is_endless else ""), color=0x000000)); return
+            was_endless = data.get("endless", False)
+            if was_endless:
+                players[interaction.user.id] = {
+                    "km": 0, "food": 6, "fuel": 38, "step": 0,
+                    "visited_airplane": False, "ended": False,
+                    "bike_scrapped": False, "bath_to_delete": False, "endless": True,
+                    "met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
+                    "npc_met_km": {"千户":0,"尤莉":0},
+                    "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"]
+                }
+                save_now()
+                await interaction.response.send_message(embed=discord.Embed(title="♾️ 饿死了... 无尽旅途结束", description="在无尽荒野中倒下...\n\n已重置为无尽起点\n6食物 38燃料 / 0km", color=0x000000))
+            else:
+                players[interaction.user.id] = {
+                    "km": 0, "food": 2, "fuel": 28, "step": 0,
+                    "visited_airplane": False, "ended": False,
+                    "bike_scrapped": False, "bath_to_delete": False, "endless": False,
+                    "met_npcs": set(["千户","尤莉"]),
+                    "npc_met_km": {"千户":0,"尤莉":0},
+                    "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
+                }
+                save_now()
+                await interaction.response.send_message(embed=discord.Embed(title="饿死了...", description="旅途结束了...\n已重置为普通起点\n2食物 28燃料 / 0km", color=0x000000))
+            return
 
     if not is_endless and prev_km < 550 <= data["km"]:
         save_now()
@@ -434,7 +448,7 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Bot 上线 v19.0 850NewImg")
+    print("Bot 上线 v19.1 DeathFix 850New")
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
