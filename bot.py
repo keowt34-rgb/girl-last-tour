@@ -41,7 +41,7 @@ load_save()
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v15.5 | {len(players)}人 {total}km"
+    return f"Kettenkrad v15.5-discordapp | {len(players)}人 {total}km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -50,7 +50,7 @@ def run_flask():
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# ===== 特殊奖励 - 4图全本地 =====
+# ===== 特殊奖励 - discordapp外链版，不用File() =====
 SPECIAL_REWARDS = {
     "尤莉的笑脸": {"text": "尤莉：嘿嘿~ 千户你看我笑得可爱吗？\n千户：...笨蛋。", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967112982663238/44b80e01a3f2b3cb9d0bb35479393411.jpg?ex=6ae330b3&is=6ae1df33&hm=f0847625bf118e334badacf391241518b4bbcc611c24ba28d41bc2febedd04f2&", "color": 0xf2c17c, "effect": "food+1"},
     "尤莉的歌声": {"text": "尤莉：♪~ 拉拉拉~ 终末世界也要唱歌！", "image": None, "color": 0xf2c17c, "effect": "fuel+2"},
@@ -62,7 +62,7 @@ SPECIAL_REWARDS = {
     "发光的努可": {"text": "努可把子弹吃掉了，全身发光...\n效果：燃料充满", "image": None, "color": 0xffffff, "effect": "fuel_full"},
     "电能 x100": {"text": "努可：努可！ (释放100电能)", "image": None, "color": 0xffffff, "effect": "fuel+100"},
     "星空的照片": {"text": "……嗯。\n\n千户：...好美。\n—— 终末的星空", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae330b7&is=6ae1df37&hm=8553fc19adecb9faf90bf90e5eb82dd40857b36c06b75a47853e4ab9210ad731&", "color": 0x000000, "effect": "END"},
-    "END标记": {"text": "上面什么都没有了。\n但旅途本身，就是意义。\n—— 少女终末旅行 完", "image": "ending.jpg", "color": 0x000000, "effect": "END"},
+    "END标记": {"text": "上面什么都没有了。\n但旅途本身，就是意义。\n—— 少女终末旅行 完", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85&", "color": 0x000000, "effect": "END"},
     "小地藏雕像": {"text": "石像爷爷：保佑你们的旅途。", "image": None, "color": 0xa9a9a9, "effect": "none"},
     "飞机设计图": {"text": "石井：这架飞机本来想去上层的", "image": None, "color": 0xdeb887, "effect": "none"},
     "世界地图(残缺)": {"text": "金泽：这地图我画了半辈子", "image": None, "color": 0x87ceeb, "effect": "none"},
@@ -143,14 +143,7 @@ class TradeView(discord.ui.View):
                 if sp["effect"]=="fuel_full": p["fuel"]=999
                 emb=discord.Embed(title=f"✨ {reward}", description=f"{sp['text']}\n\n{self.offer} -> {reward}", color=sp["color"])
                 if sp["image"]:
-                    try:
-                        f = discord.File(sp["image"], filename=sp["image"])
-                        emb.set_image(url=f"attachment://{sp['image']}")
-                        await interaction.response.edit_message(embed=emb, attachments=[f], view=None)
-                        save_now()
-                        return
-                    except Exception as e:
-                        print(f"[IMG] {sp['image']} 没找到: {e}")
+                    emb.set_image(url=sp["image"])
                 await interaction.response.edit_message(embed=emb, view=None)
             else:
                 await interaction.response.edit_message(embed=discord.Embed(title=f"与 {self.npc_name} 交易", description=f"{self.offer} -> {reward}", color=ALL_NPCS[self.npc_name]["color"]), view=None)
@@ -242,13 +235,8 @@ async def 步行(interaction: discord.Interaction):
         data["inventory"].append("星空的照片")
         save_now()
         embed = discord.Embed(title="—— 1000km，终点", description="……嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完", color=0x000000)
-        try:
-            file = discord.File("https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85&", filename="ending.jpg")
-            embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c87819")
-            await interaction.response.send_message(embed=embed, file=file)
-        except Exception as e:
-            print(f"[IMG] https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85& 没找到: {e}")
-            await interaction.response.send_message(embed=embed)
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae330b4&is=6ae1df34&hm=3568f2eb3183a449c878197dd0c48b29a5cecd1b1a677c2ae390f19078c38b85&")
+        await interaction.response.send_message(embed=embed)
         return
 
     if prev_km < 750 <= data["km"]:
@@ -356,7 +344,7 @@ async def 图鉴(interaction: discord.Interaction):
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print("Bot 上线 v15.5 - 4图本地版")
+    print("Bot 上线 v15.5 - discordapp外链版")
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
