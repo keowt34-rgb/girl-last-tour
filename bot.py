@@ -332,7 +332,7 @@ class WalkView(discord.ui.View):
 class ResumeView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=None)
-        self.user_id = 。
+        self.user_id = user_id
         p = get_player(user_id)
         self.add_item(FoodUseSelect(user_id, p["inventory"]))
     @discord.ui.button(label="恢复前进", style=discord.ButtonStyle.success, emoji="▶️")
@@ -573,15 +573,15 @@ async def do_walk_logic(interaction: discord.Interaction):
 
     if is_endless:
         move = random.randint(1, 2) if (not has_bike or data["fuel"] <= 0) else random.randint(4, 7)
-    else:
-        if not has_bike:
-            move = random.randint(1, 3) if data.get("bike_scrapped") else random.randint(1, 2)
-        elif data["fuel"] <= 0:
-            move = random.randint(1, 2)
-        else:
-            move = random.randint(3, 6)
-
         data["km"] += move
+else:
+    if not has_bike:
+        move = random.randint(1, 3) if data.get("bike_scrapped") else random.randint(1, 2)
+    elif data["fuel"] <= 0:
+        move = random.randint(1, 2)
+    else:
+        move = random.randint(3, 6)
+    data["km"] += move
 
     # 检查有没有到固定关卡
     for km_key in FIXED_STORIES.keys():
@@ -592,8 +592,8 @@ async def do_walk_logic(interaction: discord.Interaction):
                 description=story["pages"][0], 
                 color=0x8b9a7d
             )
-            if 0 == story.get("image_index", -1):
-                embed.set_image(url=story.get("image_url"))
+            if "images" in story and 0 in story["images"]:
+                embed.set_image(url=story["images"][0])
             await interaction.followup.send(embed=embed, view=FixedStoryView(interaction.user.id, km_key, 0))
             save_now()
             return
