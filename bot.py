@@ -557,9 +557,61 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
         await interaction.followup.send(embed=discord.Embed(title=f"与 {用户.display_name} 交易"), view=view, ephemeral=True)
 
 @bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print("Bot 上线 v19.6 FINAL")
+async def on_guild_join(guild: discord.Guild):
+    inviter = None
+    try:
+        if guild.me.guild_permissions.view_audit_log:
+            async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add):
+                if entry.target and entry.target.id == bot.user.id:
+                    inviter = entry.user
+                    break
+    except:
+        pass
+
+    owner = guild.owner
+    if owner is None:
+        try:
+            owner = await guild.fetch_member(guild.owner_id)
+        except:
+            pass
+
+    embed = discord.Embed(
+        title="📮 Kettenkrad 已加入 - 少女终末旅行",
+        description=(
+            f"感谢邀请！Kettenkrad履带摩托已抵达 **{guild.name}**\n\n"
+            f"**邀请者：** {inviter.mention if inviter else '未知'}\n"
+            f"**群主：** {owner.mention if owner else f'<@{guild.owner_id}>'}\n\n"
+            f"**玩法：**\n"
+            f"`/步行` 开始1000km的终末之旅\n"
+            f"`/背包` 查看物资\n"
+            f"`/交易` 与旅人交换\n"
+            f"`/无尽模式` 无尽荒野永无终点\n\n"
+            f"⚠️ *此邀请提示仅私信邀请者和群主*"
+        ),
+        color=0x8b9a7d
+    )
+    # ===== 这里放你的图片链接 =====
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080159318186/images_29.jpg?ex=6ae4365f&is=6ae2e4df&hm=e3239513b76357c43ee23bacd20f25c1505c1bd075f1e4784c0bfe78edaf9d1e&")
+    embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080620556398/-9lddQ5-j03nZ2mT3cSzk-k0.png?ex=6ae4365f&is=6ae2e4df&hm=12ba71765e1f6b7fc46de52c4db4c0a9c42fe12598a0090bf39894f2be666b0c&")
+    embed.set_footer(text=f"0km起点 2食物28燃料 | 由 {inviter.display_name if inviter else '旅人'} 邀请")
+
+    # 群里发
+    try:
+        send_channel = guild.system_channel or next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
+        if send_channel:
+            await send_channel.send(embed=embed)
+    except:
+        pass
+
+    # 只私信邀请者+群主
+    targets = {u for u in [inviter, owner] if u and not u.bot}
+    for user in targets:
+        try:
+            await user.send(embed=embed)
+        except:
+            pass
+
+    save_now()
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
