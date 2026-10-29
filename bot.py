@@ -87,13 +87,15 @@ def sync_item(p, item_name, add=True):
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v19.6 FINAL | {len(players)}人 {total}km"
+    return f"Kettenkrad v20.1 FINAL x2 | {len(players)}人 {total}km | 2000km终点"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
 intents = discord.Intents.default()
+intents.guilds = True
+intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 SPECIAL_REWARDS = {
@@ -106,8 +108,8 @@ SPECIAL_REWARDS = {
     "管制官的密钥": {"text": "管制官：密钥已移交...工厂将永远运行。\n直到上层崩塌...", "image": None, "color": 0xff4444, "effect": "fuel+50"},
     "发光的努可": {"text": "努可把子弹吃掉了，全身发光...\n尤莉：哇！发光了！\n效果：燃料充满", "image": None, "color": 0xffffff, "effect": "fuel_full"},
     "电能 x100": {"text": "努可：努可！ (释放100电能)", "image": None, "color": 0xffffff, "effect": "fuel+100"},
-    "星空的照片": {"text": "……嗯。\n\n千户：...好美。\n尤莉：这就是上层吗？\n—— 终末的星空", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae330b7&is=6ae1df37&hm=8553fc19adecb9faf90bf90e5eb82dd40857b36c06b75a47853e4ab9210ad731&", "color": 0x000000, "effect": "END"},
-    "END标记": {"text": "上面什么都没有了。\n但旅途本身，就是意义。\n—— 少女终末旅行 完", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564980687608483930/Screenshot_20261028_203421.jpg?ex=6ae33d57&is=6ae1ebd7&hm=a8b27dcf5f82a7523ca141181444084e539a67e11c5a56fb4fc598dbfb5d1dd8&", "color": 0x000000, "effect": "END"},
+    "星空的照片": {"text": "……嗯。\n\n千户：...好美。\n尤莉：这就是上层吗？\n—— 终末的星空", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae3d977&is=6ae287f7&hm=8e9c12b7b26a37f13e7088978dd3bdb0fb06612a955033c5a9f72a70e3972de6&", "color": 0x000000, "effect": "END"},
+    "END标记": {"text": "上面什么都没有了。\n但旅途本身，就是意义。\n—— 少女终末旅行 完", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564980687608483930/Screenshot_20261028_203421.jpg?ex=6ae3e617&is=6ae29497&hm=d4aebc9fdea69bcbcaaf74b9d3021744c174b3b23687afb66f587be4e4ef800f&", "color": 0x000000, "effect": "END"},
     "小地藏雕像": {"text": "石像爷爷：保佑你们的旅途。\n尤莉：谢谢爷爷！", "image": None, "color": 0xa9a9a9, "effect": "none"},
     "飞机设计图": {"text": "石井：这架飞机本来想去上层的...不过现在只能留在这里了", "image": None, "color": 0xdeb887, "effect": "none"},
     "世界地图(残缺)": {"text": "金泽：这地图我画了半辈子...还是没画完啊", "image": None, "color": 0x87ceeb, "effect": "none"},
@@ -238,7 +240,7 @@ class RestartView(discord.ui.View):
             "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
         }
         save_now()
-        await interaction.response.edit_message(embed=discord.Embed(title="🔄 旅途重新开始", description="0km / 1000km", color=0x8b9a7d), view=None)
+        await interaction.response.edit_message(embed=discord.Embed(title="🔄 旅途重新开始", description="0km / 2000km", color=0x8b9a7d), view=None)
 
 class TradeView(discord.ui.View):
     def __init__(self, from_id, to_id=None, npc_name=None, inventory=None):
@@ -321,6 +323,64 @@ class GiveView(discord.ui.View):
         save_now()
         await interaction.response.edit_message(embed=discord.Embed(title="DEV给予成功", description=f"已获得 {self.offer}\n现在 食物{p['food']} 燃料{p['fuel']}", color=0xffd700), view=None)
 
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Kettenkrad v20.1 | 已在 {len(bot.guilds)} 个服务器 | 2000km终点")
+
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    me = guild.get_member(bot.user.id) or guild.me
+    inviter = None
+    try:
+        if me and me.guild_permissions.view_audit_log:
+            async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add):
+                if entry.target and entry.target.id == bot.user.id:
+                    inviter = entry.user
+                    break
+    except:
+        pass
+
+    owner = guild.owner
+    if owner is None:
+        try:
+            owner = await guild.fetch_member(guild.owner_id)
+        except:
+            pass
+
+    embed = discord.Embed(
+        title="📮 Kettenkrad 已加入 - 少女终末旅行",
+        description=(
+            f"感谢邀请！Kettenkrad履带摩托已抵达 **{guild.name}**\n\n"
+            f"**邀请者：** {inviter.mention if inviter else '未知'}\n"
+            f"**群主：** {owner.mention if owner else f'<@{guild.owner_id}>'}\n\n"
+            f"**玩法：**\n"
+            f"`/步行` 开始2000km的终末之旅 [有油3-6km/无油1-2km/1700报废后1-3km]\n"
+            f"`/背包` 查看物资\n"
+            f"`/交易` 与旅人交换\n"
+            f"`/无尽模式` 无尽荒野永无终点 150km提示\n\n"
+            f"⚠️ *此邀请提示仅私信邀请者和群主*"
+        ),
+        color=0x8b9a7d
+    )
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080159318186/images_29.jpg?ex=6ae4365f&is=6ae2e4df&hm=e3239513b76357c43ee23bacd20f25c1505c1bd075f1e4784c0bfe78edaf9d1e&")
+    embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080620556398/-9lddQ5-j03nZ2mT3cSzk-k0.png?ex=6ae4365f&is=6ae2e4df&hm=12ba71765e1f6b7fc46de52c4db4c0a9c42fe12598a0090bf39894f2be666b0c&")
+    embed.set_footer(text=f"0km起点 2食物28燃料 | 由 {inviter.display_name if inviter else '旅人'} 邀请")
+
+    try:
+        send_channel = guild.system_channel or next((ch for ch in guild.text_channels if ch.permissions_for(me).send_messages), None)
+        if send_channel:
+            await send_channel.send(embed=embed)
+    except:
+        pass
+
+    targets = {u for u in [inviter, owner] if u and not u.bot}
+    for user in targets:
+        try:
+            await user.send(embed=embed)
+        except:
+            pass
+
 @bot.tree.command(name="开发者", description="开发者模式[仅限]")
 async def 开发者(interaction: discord.Interaction):
     if interaction.user.id not in DEV_IDS: await interaction.response.send_message("❌ 你不是开发者", ephemeral=True); return
@@ -392,7 +452,7 @@ async def 步行(interaction: discord.Interaction):
         await interaction.response.send_message(embed=discord.Embed(title="留在1700km", description="你们把Kettenkrad浴缸留在了1700km，继续徒步向上。\n尤莉：再见了，浴缸...", color=0x555555))
         return
 
-    # === 移速规则 ===
+    # === 移速规则 v20.1 ===
     if is_endless:
         if not is_dev_now:
             if not has_bike or data["fuel"] <= 0:
@@ -423,7 +483,8 @@ async def 步行(interaction: discord.Interaction):
 
     if not is_dev_now:
         data["food"] -= 1
-        if has_bike: data["fuel"] = max(0, data["fuel"] - 1)
+        if data["fuel"] > 0:
+            data["fuel"] = max(0, data["fuel"] - 1)
         if data["food"] <= 0:
             was_endless = data.get("endless", False)
             if was_endless:
@@ -472,7 +533,7 @@ async def 步行(interaction: discord.Interaction):
     if not is_endless and data["km"] >= 2000 and not data["ended"]:
         data["ended"] = True; save_now()
         embed = discord.Embed(title="—— 2000km，终点", description="千户：...上面什么都没有啊\n尤莉：嗯\n千户：我们走了2000km，就为了看这个？\n尤莉：千户，你看，星星好漂亮\n千户：...嗯\n\n我们现在是世界上最幸福的人。", color=0x000000)
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg")
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae3d977&is=6ae287f7&hm=8e9c12b7b26a37f13e7088978dd3bdb0fb06612a955033c5a9f72a70e3972de6&")
         await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id)); return
 
     if is_endless:
@@ -542,6 +603,7 @@ async def 步行(interaction: discord.Interaction):
         embed = discord.Embed(title="🔧 找到杂物", description=f"获得 {item}\n\n{dialogue}", color=0x666666)
         embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 食物{data['food']} 燃料{data['fuel']} | +{move}km")
         await interaction.response.send_message(embed=embed); return
+
 @bot.tree.command(name="背包", description="查看背包")
 async def 背包(interaction: discord.Interaction):
     d=get_player(interaction.user.id)
@@ -567,63 +629,6 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
             await interaction.followup.send("❌ 请@一个玩家或选一个NPC", ephemeral=True); return
         view = TradeView(interaction.user.id, to_id=用户.id, inventory=d["inventory"])
         await interaction.followup.send(embed=discord.Embed(title=f"与 {用户.display_name} 交易"), view=view, ephemeral=True)
-
-@bot.event
-async def on_guild_join(guild: discord.Guild):
-    inviter = None
-    try:
-        if guild.me.guild_permissions.view_audit_log:
-            async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add):
-                if entry.target and entry.target.id == bot.user.id:
-                    inviter = entry.user
-                    break
-    except:
-        pass
-
-    owner = guild.owner
-    if owner is None:
-        try:
-            owner = await guild.fetch_member(guild.owner_id)
-        except:
-            pass
-
-    embed = discord.Embed(
-        title="📮 Kettenkrad 已加入 - 少女终末旅行",
-        description=(
-            f"感谢邀请！Kettenkrad履带摩托已抵达 **{guild.name}**\n\n"
-            f"**邀请者：** {inviter.mention if inviter else '未知'}\n"
-            f"**群主：** {owner.mention if owner else f'<@{guild.owner_id}>'}\n\n"
-            f"**玩法：**\n"
-            f"`/步行` 开始1000km的终末之旅\n"
-            f"`/背包` 查看物资\n"
-            f"`/交易` 与旅人交换\n"
-            f"`/无尽模式` 无尽荒野永无终点\n\n"
-            f"⚠️ *此邀请提示仅私信邀请者和群主*"
-        ),
-        color=0x8b9a7d
-    )
-    # ===== 这里放你的图片链接 =====
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080159318186/images_29.jpg?ex=6ae4365f&is=6ae2e4df&hm=e3239513b76357c43ee23bacd20f25c1505c1bd075f1e4784c0bfe78edaf9d1e&")
-    embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080620556398/-9lddQ5-j03nZ2mT3cSzk-k0.png?ex=6ae4365f&is=6ae2e4df&hm=12ba71765e1f6b7fc46de52c4db4c0a9c42fe12598a0090bf39894f2be666b0c&")
-    embed.set_footer(text=f"0km起点 2食物28燃料 | 由 {inviter.display_name if inviter else '旅人'} 邀请")
-
-    # 群里发
-    try:
-        send_channel = guild.system_channel or next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
-        if send_channel:
-            await send_channel.send(embed=embed)
-    except:
-        pass
-
-    # 只私信邀请者+群主
-    targets = {u for u in [inviter, owner] if u and not u.bot}
-    for user in targets:
-        try:
-            await user.send(embed=embed)
-        except:
-            pass
-
-    save_now()
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
