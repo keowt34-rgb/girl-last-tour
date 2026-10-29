@@ -394,7 +394,7 @@ async def on_guild_join(guild: discord.Guild):
             f"Kettenkrad已抵达 **{guild.name}**\n\n"
             f"**邀请者：** {inviter.mention if inviter else '未知'}\n"
             f"**群主：** {owner.mention if owner else f'<@{guild.owner_id}>'}\n\n"
-            f"**玩法：**\n\n
+            f"**玩法：**\n\n"
             f"`/步行` 开始3000km终末之旅 [每步-5%饥饿]\n"
             f"`/背包` 查看物资 + 食物下拉\n"
             f"`/交易` 与旅人交换\n"
