@@ -145,11 +145,13 @@ RANDOM_LOOT = [
 ALL_ITEMS_POOL = list(set(list(FOOD_HUNGER.keys()) + ["燃料桶 x20","燃料桶(半满)","生锈的螺栓","空罐头","旧报纸","破布","发光的石头","38式步枪子弹 x5","空弹壳","手绘地图碎片","世界地图(残缺)","金泽的眼镜","小地藏雕像","石像 x10","石像爷爷的刻刀","飞机设计图","螺旋桨碎片","管制官的密钥","日记(千户写的)","修理工具","旧式相机胶卷","尤莉的笑脸","尤莉的歌声","尤莉的拥抱","发光的努可","电能 x100","星空的照片","END标记"]))
 
 FIXED_STORIES = {
-        25: {
-        "title": "📍 25km - 夜光下的热汤",
+    "soup": {
+        "type": "step",  # 这个是按步数触发
+        "at": 25,         # 25步触发
+        "title": "📍 25步 - 夜光下的热汤",
         "pages": [
-            "尤莉：肚子好饿...千户，难得出来我们喝口汤吧。/n"
-            "千户：好啦，就当作是纪念我们出来了/n"
+            "尤莉：肚子好饿...千户，难得出来我们喝口汤吧。\n"
+            "千户：好啦，就当作是纪念我们出来了\n"
             "尤莉：太棒了！",
             
             "于是他们在附近暂时居住喝口汤\n\n"
@@ -170,7 +172,9 @@ FIXED_STORIES = {
             2: "https://cdn.discordapp.com/attachments/1519326691095478272/1565373186307260446/Screenshot_20261029_215528_com.android.chrome_edit_193623155043371.jpg?ex=6ae4aae2&is=6ae35962&hm=0024f83146d81b015d7dcaa9759ba93234d4fc565d239e1204641de0c8109436&"
         }
     },
-    100: {
+    "hotspring": {
+        "type": "km",  # 这个是按公里触发
+        "at": 100,      # 100km触发
         "title": "📍 100km - 暴风雪中的温泉",
         "pages": [
             "雪越来越大了，什么都看不见。\n\n"
@@ -178,24 +182,21 @@ FIXED_STORIES = {
             "能见度不到5米。\n\n"
             "尤莉：千户...好冷...\n"
             "千户：再坚持一下！",
-
             "千户：等一下...那个水管有热气？\n"
             "尤莉：诶？真的耶！\n\n"
             "那根水管上面竟然没有雪，顺着蒸汽找过去，废弃的管道上...居然有水声。",
-
             "尤莉：是温泉！是温泉啊千户！\n"
             "千户：真的是热水...想要洗个澡。\n"
             "尤莉：你等我一下，看我拿枪射爆那个水管。\n\n"
             "砰的一声，水管爆开了，千户赶紧驾Kettenkrad拉来了一个废弃水管",
-
+            
             "两个人把Kettenkrad停好，脱掉厚重的军大衣。\n\n"
-            "千户：呜啊~ 活过来了~\n\n"
+            "千户：呜啊~ 活过来了~\n"
             "尤莉：千户你脸好红~\n"
-            "千户：是...是被热气熏的啦！\n\n"
+            "千户：是...是被热气熏的啦！\n"
             "雪还在外面下，这里却暖和得像梦一样。\n"
             "—— 饥饿+60%"
         ],
-        # 两张图，第一页放你的雪地车图，第四页放温泉图
         "images": {
             0: "https://cdn.discordapp.com/attachments/1519326691095478272/1565427726142152754/Screenshot_20261029_232929_com.android.chrome_edit_206629181038261.jpg?ex=6ae4ddae&is=6ae38c2e&hm=2e9a8484279f566021591c4ad556f606a7c9d3b2f4732cf493b7834bca0901cf&",
             3: "https://cdn.discordapp.com/attachments/1519326691095478272/1565427726607847548/Screenshot_20261029_233229_com.android.chrome_edit_206635598435656.jpg?ex=6ae4ddae&is=6ae38c2e&hm=115de438991d62a767b1c40e219e07f92aa3316e14eed2754fcf735dd9fcf9a1&"
@@ -274,10 +275,10 @@ class FoodUseSelect(discord.ui.Select):
         await interaction.response.edit_message(embed=embed, view=new_view)
 
 class FixedStoryView(discord.ui.View):
-    def __init__(self, user_id, km_key, page=0):
+    def __init__(self, user_id, story_id, page=0):
         super().__init__(timeout=None)
         self.user_id = user_id
-        self.km_key = km_key
+        self.story_id = story_id
         self.page = page
 
     @discord.ui.button(label="▶️ 下一步", style=discord.ButtonStyle.primary)
@@ -286,11 +287,11 @@ class FixedStoryView(discord.ui.View):
             await interaction.response.send_message("❌ 不是你的旅途", ephemeral=True)
             return
         p = get_player(self.user_id)
-        story = FIXED_STORIES[self.km_key]
+        story = FIXED_STORIES[self.story_id]
         self.page += 1
         if self.page >= len(story["pages"]):
-            if self.km_key not in p["fixed_done"]:
-                p["fixed_done"].append(self.km_key)
+            if self.story_id not in p["fixed_done"]:
+                p["fixed_done"].append(self.story_id)
                 p["hunger"] = min(100, p["hunger"] + 60)
             save_now()
             await interaction.response.edit_message(embed=discord.Embed(title=f"{story['title']} - End", description="Continue.", color=0x8b9a7d), view=WalkView(self.user_id))
@@ -298,8 +299,8 @@ class FixedStoryView(discord.ui.View):
         embed = discord.Embed(title=f"{story['title']} [{self.page+1}/{len(story['pages'])}]", description=story["pages"][self.page], color=0x8b9a7d)
         if "images" in story and self.page in story["images"]:
             embed.set_image(url=story["images"][self.page])
-        await interaction.response.edit_message(embed=embed, view=FixedStoryView(self.user_id, self.km_key, self.page))
-
+        await interaction.response.edit_message(embed=embed, view=FixedStoryView(self.user_id, self.story_id, self.page))
+        
 class WalkView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=None)
@@ -590,17 +591,29 @@ async def do_walk_logic(interaction: discord.Interaction):
         data["km"] += move
 
     # 检查有没有到固定关卡
-    for km_key in FIXED_STORIES.keys():
-        if prev_km < km_key <= data["km"] and km_key not in data.get("fixed_done", []):
-            story = FIXED_STORIES[km_key]
+        prev_step = data["step"] - 1
+    for story_id, story in FIXED_STORIES.items():
+        if story_id in data.get("fixed_done", []):
+            continue
+        
+        triggered = False
+        if story.get("type") == "step":
+            if prev_step < story["at"] <= data["step"]:
+                triggered = True
+        else: # type == "km"
+            if prev_km < story["at"] <= data["km"]:
+                triggered = True
+        
+        if triggered:
             embed = discord.Embed(
-                title=f"{story['title']} [1/{len(story['pages'])}]", 
-                description=story["pages"][0], 
+                title=f"{story['title']} [1/{len(story['pages'])}]",
+                description=story["pages"][0],
                 color=0x8b9a7d
             )
             if "images" in story and 0 in story["images"]:
                 embed.set_image(url=story["images"][0])
-            await interaction.followup.send(embed=embed, view=FixedStoryView(interaction.user.id, km_key, 0))
+            # 注意这里传 story_id，不是数字了
+            await interaction.followup.send(embed=embed, view=FixedStoryView(interaction.user.id, story_id, 0))
             save_now()
             return
 
