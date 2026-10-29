@@ -94,8 +94,6 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 SPECIAL_REWARDS = {
@@ -329,24 +327,31 @@ async def on_ready():
     print(f"Kettenkrad v20.1 | 已在 {len(bot.guilds)} 个服务器 | 2000km终点")
 
 @bot.event
+@bot.event
 async def on_guild_join(guild: discord.Guild):
     me = guild.get_member(bot.user.id) or guild.me
     inviter = None
+    
+    # 1. 尝试找邀请者
     try:
         if me and me.guild_permissions.view_audit_log:
-            async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add):
+            async for entry in guild.audit_logs(limit=10, action=discord.AuditLogAction.bot_add):
                 if entry.target and entry.target.id == bot.user.id:
                     inviter = entry.user
                     break
-    except:
-        pass
+    except Exception as e:
+        print(f"[INVITE] 找不到邀请者: {e}")
 
+    # 2. 拿群主
     owner = guild.owner
     if owner is None:
         try:
             owner = await guild.fetch_member(guild.owner_id)
         except:
-            pass
+            try:
+                owner = await bot.fetch_user(guild.owner_id)
+            except:
+                owner = None
 
     embed = discord.Embed(
         title="📮 Kettenkrad 已加入 - 少女终末旅行",
@@ -358,7 +363,7 @@ async def on_guild_join(guild: discord.Guild):
             f"`/步行` 开始2000km的终末之旅 [有油3-6km/无油1-2km/1700报废后1-3km]\n"
             f"`/背包` 查看物资\n"
             f"`/交易` 与旅人交换\n"
-            f"`/无尽模式` 无尽荒野永无终点 150km提示\n\n"
+            f"`/无尽模式` 无尽荒野,永无终点\n\n"
             f"⚠️ *此邀请提示仅私信邀请者和群主*"
         ),
         color=0x8b9a7d
@@ -367,19 +372,34 @@ async def on_guild_join(guild: discord.Guild):
     embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080620556398/-9lddQ5-j03nZ2mT3cSzk-k0.png?ex=6ae4365f&is=6ae2e4df&hm=12ba71765e1f6b7fc46de52c4db4c0a9c42fe12598a0090bf39894f2be666b0c&")
     embed.set_footer(text=f"0km起点 2食物28燃料 | 由 {inviter.display_name if inviter else '旅人'} 邀请")
 
+    # 3. 群里发一份
     try:
-        send_channel = guild.system_channel or next((ch for ch in guild.text_channels if ch.permissions_for(me).send_messages), None)
+        send_channel = guild.system_channel
+        if not send_channel:
+            for ch in guild.text_channels:
+                if ch.permissions_for(me).send_messages:
+                    send_channel = ch
+                    break
         if send_channel:
             await send_channel.send(embed=embed)
-    except:
-        pass
+    except Exception as e:
+        print(f"[GUILD SEND] 失败: {e}")
 
-    targets = {u for u in [inviter, owner] if u and not u.bot}
-    for user in targets:
+    # 4. 只私信邀请者 + 群主
+    dm_targets = []
+    if inviter and not inviter.bot:
+        dm_targets.append(inviter)
+    if owner and not owner.bot and (not inviter or owner.id != inviter.id):
+        dm_targets.append(owner)
+
+    print(f"[JOIN] {guild.name} 邀请者:{inviter} 群主:{owner} 准备私信{len(dm_targets)}人")
+
+    for user in dm_targets:
         try:
             await user.send(embed=embed)
-        except:
-            pass
+            print(f"[DM] 已私信 {user} ({user.id})")
+        except Exception as e:
+            print(f"[DM] 私信 {user} 失败: {e} (可能是对方关了私信)")
 
 @bot.tree.command(name="开发者", description="开发者模式[仅限]")
 async def 开发者(interaction: discord.Interaction):
