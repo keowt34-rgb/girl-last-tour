@@ -572,16 +572,22 @@ async def do_walk_logic(interaction: discord.Interaction):
         return
 
     if is_endless:
-        move = random.randint(1, 2) if (not has_bike or data["fuel"] <= 0) else random.randint(4, 7)
+        if not has_bike or data["fuel"] <= 0:
+            move = random.randint(1, 2)
+        else:
+            move = random.randint(4, 7)
         data["km"] += move
-else:
-    if not has_bike:
-        move = random.randint(1, 3) if data.get("bike_scrapped") else random.randint(1, 2)
-    elif data["fuel"] <= 0:
-        move = random.randint(1, 2)
     else:
-        move = random.randint(3, 6)
-    data["km"] += move
+        if not has_bike:
+            if data.get("bike_scrapped"):
+                move = random.randint(1, 3)
+            else:
+                move = random.randint(1, 2)
+        elif data["fuel"] <= 0:
+            move = random.randint(1, 2)
+        else:
+            move = random.randint(3, 6)
+        data["km"] += move
 
     # 检查有没有到固定关卡
     for km_key in FIXED_STORIES.keys():
