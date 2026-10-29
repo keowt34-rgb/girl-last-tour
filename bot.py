@@ -147,7 +147,7 @@ ALL_ITEMS_POOL = list(set(list(FOOD_HUNGER.keys()) + ["燃料桶 x20","燃料桶
 FIXED_STORIES = {
     "soup": {
         "type": "step",  # 这个是按步数触发
-        "at": 25,         # 25步触发
+        "at": 6,         # 25步触发
         "title": "📍 25步 - 夜光下的热汤",
         "pages": [
             "尤莉：肚子好饿...千户，难得出来我们喝口汤吧。\n"
@@ -174,7 +174,7 @@ FIXED_STORIES = {
     },
     "hotspring": {
         "type": "km",  # 这个是按公里触发
-        "at": 100,      # 100km触发
+        "at": 75,      # 100km触发
         "title": "📍 100km - 暴风雪中的温泉",
         "pages": [
             "雪越来越大了，什么都看不见。\n\n"
