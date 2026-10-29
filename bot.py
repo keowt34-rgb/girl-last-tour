@@ -122,14 +122,14 @@ NPC_DIALOGUE = {
 }
 
 ALL_NPCS = {
-    "金泽": {"color": 0x87ceeb, "km_need": 50},
-    "石像爷爷": {"color": 0xa9a9a9, "km_need": 150},
-    "石井": {"color": 0xdeb887, "km_need": 300},
-    "管制官": {"color": 0xff4444, "km_need": 500},
-    "努可": {"color": 0xffffff, "km_need": 700},
+    "金泽": {"color": 0x87ceeb, "km_need": 100},
+    "石像爷爷": {"color": 0xa9a9a9, "km_need": 300},
+    "石井": {"color": 0xdeb887, "km_need": 600},
+    "管制官": {"color": 0xff4444, "km_need": 1000},
+    "努可": {"color": 0xffffff, "km_need": 1400},
     "尤莉": {"color": 0xf2c17c, "km_need": 0},
     "千户": {"color": 0x8b9a7d, "km_need": 0},
-    "上层的幽灵": {"color": 0x000000, "km_need": 1000},
+    "上层的幽灵": {"color": 0x000000, "km_need": 2000},
 }
 
 DROP_TABLE = {
@@ -354,14 +354,14 @@ async def 无尽模式(interaction: discord.Interaction):
         embed = discord.Embed(title="返回普通模式？", description=f"你现在无尽模式 {d['km']}km\n\n⚠️ **如果返回普通模式，你当前的无尽进度会消失，你确定吗？**", color=0xff8800)
         await interaction.response.send_message(embed=embed, view=EndlessConfirmView(interaction.user.id, to_endless=False), ephemeral=True)
 
-@bot.tree.command(name="步行", description="步行1000km到上层")
+@bot.tree.command(name="步行", description="步行2000km到上层")
 async def 步行(interaction: discord.Interaction):
     data = get_player(interaction.user.id)
     is_dev_now = interaction.user.id in dev_mode_users
     is_endless = data.get("endless", False)
 
     if data["ended"] and not is_dev_now and not is_endless:
-        embed = discord.Embed(title="—— 1000km，终点", description="你们已经在终点了。\n我们现在是世界上最幸福的人。", color=0x000000)
+        embed = discord.Embed(title="—— 2000km，终点", description="你们已经在终点了。\n我们现在是世界上最幸福的人。", color=0x000000)
         await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id), ephemeral=True)
         return
 
@@ -383,21 +383,34 @@ async def 步行(interaction: discord.Interaction):
     data["step"] += 1
     has_bike = any("Kettenkrad" in i or "履带摩托" in i for i in data["inventory"])
 
-    if data.get("bath_to_delete", False) and not is_dev_now and not is_endless:
+    if data.get("bath_to_delete", False) and not is_endless:
         data["bath_to_delete"] = False
         for i in range(len(data["inventory"])-1, -1, -1):
             if "Kettenkrad浴缸" in data["inventory"][i]:
                 del data["inventory"][i]; break
         save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="留在850km", description="你们把Kettenkrad浴缸留在了850km，继续徒步向上。\n尤莉：再见了，浴缸...", color=0x555555))
+        await interaction.response.send_message(embed=discord.Embed(title="留在1700km", description="你们把Kettenkrad浴缸留在了1700km，继续徒步向上。\n尤莉：再见了，浴缸...", color=0x555555))
         return
 
-    if not has_bike and not is_dev_now:
-        move = random.randint(1, 2)
-    elif not is_dev_now and data["fuel"] <= 0:
-        move = random.randint(1, 2)
+    # === 移速规则 ===
+    if is_endless:
+        if not is_dev_now:
+            if not has_bike or data["fuel"] <= 0:
+                move = random.randint(1, 2)
+            else:
+                move = random.randint(4, 7)
+        else:
+            move = random.randint(4, 7) if has_bike else random.randint(1, 2)
     else:
-        move = random.randint(4, 7) if is_endless else random.randint(3, 5)
+        if not is_dev_now:
+            if not has_bike:
+                move = random.randint(1, 3) if data.get("bike_scrapped") else random.randint(1, 2)
+            elif data["fuel"] <= 0:
+                move = random.randint(1, 2)
+            else:
+                move = random.randint(3, 6)
+        else:
+            move = random.randint(3, 6) if has_bike else random.randint(1, 3)
 
     data["km"] += move
 
@@ -439,27 +452,27 @@ async def 步行(interaction: discord.Interaction):
                 await interaction.response.send_message(embed=discord.Embed(title="饿死了...", description="旅途结束了...\n已重置为普通起点 2食物28燃料 / 0km", color=0x000000))
             return
 
-    if not is_endless and prev_km < 550 <= data["km"]:
+    if not is_endless and prev_km < 1100 <= data["km"]:
         save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="⚠️ 进入中层 - 550km", description="千户：补给越来越少了...\n尤莉：啊...土豆也没了...", color=0xff8800)); return
-    if not is_endless and prev_km < 750 <= data["km"]:
+        await interaction.response.send_message(embed=discord.Embed(title="⚠️ 进入中层 - 1100km", description="千户：补给越来越少了...\n尤莉：啊...土豆也没了...", color=0xff8800)); return
+    if not is_endless and prev_km < 1500 <= data["km"]:
         save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="☠️ 进入上层 - 750km", description="千户：真正的上层...什么都没有了\n尤莉：...有点可怕", color=0x111111)); return
+        await interaction.response.send_message(embed=discord.Embed(title="☠️ 进入上层 - 1500km", description="千户：真正的上层...什么都没有了\n尤莉：...有点可怕", color=0x111111)); return
 
-    if not is_endless and not data.get("bike_scrapped", False) and (prev_km < 850 <= data["km"] or (data["km"] >= 850 and has_bike)) and not is_dev_now:
+    if not is_endless and not data.get("bike_scrapped", False) and (prev_km < 1700 <= data["km"] or (data["km"] >= 1700 and has_bike)):
         data["bike_scrapped"] = True; data["bath_to_delete"] = True
         for i in range(len(data["inventory"])-1, -1, -1):
             if "Kettenkrad" in data["inventory"][i] or "履带摩托" in data["inventory"][i]:
                 del data["inventory"][i]; break
         data["inventory"].append("Kettenkrad浴缸"); save_now()
-        embed = discord.Embed(title="💥 Kettenkrad 报废 - 850km", description="嘎吱...砰。\n\n千户：...不动了。\n尤莉：修一下就好了吧？\n千户：...履带断了，引擎也烧死了。修不了了。\n尤莉：...\n\n千户：它陪我们走了850km啊...\n尤莉：一直以为它会陪我们到上层的...\n\n沉默了很久。\n\n尤莉：千户...我们把它当浴缸吧。\n尤莉：这样...它还能再陪我们一下。\n千户：嗯。\n\n热水倒进Kettenkrad的车斗里。\n嗚啊——\n\n尤莉：最后的热水澡啊...\n千户：明明这么暖和...为什么有点想哭。\n\n—— Kettenkrad报废了\n获得：Kettenkrad浴缸\n下一次步行后，浴缸会留在原地。", color=0x555555)
+        embed = discord.Embed(title="💥 Kettenkrad 报废 - 1700km", description="嘎吱...砰。\n\n千户：...不动了。\n尤莉：修一下就好了吧？\n千户：...履带断了，引擎也烧死了。修不了了。\n尤莉：...\n\n千户：它陪我们走了1700km啊...\n尤莉：一直以为它会陪我们到上层的...\n\n沉默了很久。\n\n尤莉：千户...我们把它当浴缸吧。\n尤莉：这样...它还能再陪我们一下。\n千户：嗯。\n\n热水倒进Kettenkrad的车斗里。\n嗚啊——\n\n尤莉：最后的热水澡啊...\n千户：明明这么暖和...为什么有点想哭。\n\n—— Kettenkrad报废了\n获得：Kettenkrad浴缸\n下一次步行后，浴缸会留在原地。", color=0x555555)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565030660282912889/082.jpg.webp?ex=6ae36be2&is=6ae21a62&hm=53dcefc67ca4022ed391d055e673eb9cbc707d0c9e659f326b9e95bd2d257c4b&")
         await interaction.response.send_message(embed=embed); return
 
-    if not is_endless and data["km"] >= 1000 and not data["ended"]:
+    if not is_endless and data["km"] >= 2000 and not data["ended"]:
         data["ended"] = True; save_now()
-        embed = discord.Embed(title="—— 1000km，终点", description="千户：...上面什么都没有啊\n尤莉：嗯\n千户：我们走了1000km，就为了看这个？\n尤莉：千户，你看，星星好漂亮\n千户：...嗯\n\n我们现在是世界上最幸福的人。", color=0x000000)
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae330b7&is=6ae1df37&hm=8553fc19adecb9faf90bf90e5eb82dd40857b36c06b75a47853e4ab9210ad731&")
+        embed = discord.Embed(title="—— 2000km，终点", description="千户：...上面什么都没有啊\n尤莉：嗯\n千户：我们走了2000km，就为了看这个？\n尤莉：千户，你看，星星好漂亮\n千户：...嗯\n\n我们现在是世界上最幸福的人。", color=0x000000)
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg")
         await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id)); return
 
     if is_endless:
@@ -493,7 +506,7 @@ async def 步行(interaction: discord.Interaction):
             save_now()
             await interaction.response.send_message(embed=embed); return
 
-    if data["km"] < 550:
+    if data["km"] < 1100:
         roll_type = random.choices(["空空", "食物", "杂物"], weights=[30, 45, 25])[0]
     else:
         roll_type = random.choices(["空空", "食物", "杂物"], weights=[45, 35, 20])[0]
@@ -505,7 +518,7 @@ async def 步行(interaction: discord.Interaction):
         await interaction.response.send_message(embed=embed); return
 
     if roll_type == "食物":
-        if data["km"] >= 750 and not is_dev_now and not is_endless:
+        if data["km"] >= 1500 and not is_dev_now and not is_endless:
             save_now()
             await interaction.response.send_message(embed=discord.Embed(title="空空", description="真正的上层，什么都没有...")); return
         if random.random() < 0.55:
@@ -529,7 +542,6 @@ async def 步行(interaction: discord.Interaction):
         embed = discord.Embed(title="🔧 找到杂物", description=f"获得 {item}\n\n{dialogue}", color=0x666666)
         embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 食物{data['food']} 燃料{data['fuel']} | +{move}km")
         await interaction.response.send_message(embed=embed); return
-
 @bot.tree.command(name="背包", description="查看背包")
 async def 背包(interaction: discord.Interaction):
     d=get_player(interaction.user.id)
