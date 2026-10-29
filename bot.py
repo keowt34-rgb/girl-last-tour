@@ -283,31 +283,21 @@ class FixedStoryView(discord.ui.View):
     @discord.ui.button(label="▶️ 下一步", style=discord.ButtonStyle.primary)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ 不是你的旅途", ephemeral=True); return
-        
+            await interaction.response.send_message("❌ 不是你的旅途", ephemeral=True)
+            return
         p = get_player(self.user_id)
         story = FIXED_STORIES[self.km_key]
         self.page += 1
-
-        # 点完了
         if self.page >= len(story["pages"]):
             if self.km_key not in p["fixed_done"]:
                 p["fixed_done"].append(self.km_key)
                 p["hunger"] = min(100, p["hunger"] + 60)
             save_now()
-            embed = discord.Embed(title=f"{story['title']} - 结束", description="对话结束，继续旅途吧。\n饥饿+60%", color=0x8b9a7d)
-            await interaction.response.edit_message(embed=embed, view=WalkView(self.user_id))
+            await interaction.response.edit_message(embed=discord.Embed(title=f"{story['title']} - End", description="Continue.", color=0x8b9a7d), view=WalkView(self.user_id))
             return
-
-        # 还没完，显示下一页
-        embed = discord.Embed(
-            title=f"{story['title']} [{self.page+1}/{len(story['pages'])}]", 
-            description=story["pages"][self.page], 
-            color=0x8b9a7d
-        )
-        if self.page == story.get("image_index", -1):
-            embed.set_image(url=story["image_url"])
-            
+        embed = discord.Embed(title=f"{story['title']} [{self.page+1}/{len(story['pages'])}]", description=story["pages"][self.page], color=0x8b9a7d)
+        if "images" in story and self.page in story["images"]:
+            embed.set_image(url=story["images"][self.page])
         await interaction.response.edit_message(embed=embed, view=FixedStoryView(self.user_id, self.km_key, self.page))
 
 class WalkView(discord.ui.View):
