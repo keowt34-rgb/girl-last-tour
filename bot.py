@@ -1,9 +1,6 @@
 import discord
 from discord.ext import commands
-import random
-import threading
-import json
-import os
+import random, threading, json, os, time
 from flask import Flask
 from collections import Counter
 
@@ -12,6 +9,21 @@ SAVE_FILE = "save.json"
 players = {}
 dev_mode_users = set()
 DEV_IDS = [1200298327531585537]
+
+FOOD_HUNGER = {
+    "压缩口粮 x10": 100,
+    "军用口粮 x10": 100,
+    "压缩口粮 x1": 15,
+    "土豆干 x2": 30,
+    "土豆干": 15,
+    "土豆干 x10": 100,
+    "鱼": 25,
+    "烤鱼": 35,
+    "面包": 40,
+    "巧克力": 20,
+    "罐头鱼": 50,
+    "土豆粉": 10,
+}
 
 def load_save():
     global players, dev_mode_users
@@ -26,7 +38,7 @@ def load_save():
                     players[int(uid)] = pdata
                 dev_mode_users = set(data.get("dev_mode_users", []))
         except Exception as e:
-            print(f"[SAVE] 加载失败: {e}")
+            print(f"[SAVE] {e}")
 
 def save_now():
     try:
@@ -37,7 +49,7 @@ def save_now():
         with open(SAVE_FILE, "w", encoding="utf-8") as f:
             json.dump(save_data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"[SAVE] 保存失败: {e}")
+        print(f"[SAVE] {e}")
 
 load_save()
 
@@ -47,89 +59,77 @@ def format_backpack(inventory):
     for i in inventory:
         if i not in seen:
             seen.append(i)
-    lines = []
-    for name in seen:
-        c = counter[name]
-        if c > 1:
-            lines.append(f"{name} x{c}")
-        else:
-            lines.append(name)
+    lines = [f"{name} x{counter[name]}" if counter[name]>1 else name for name in seen]
     return lines, counter
 
 def get_unique_for_trade(inventory):
-    seen = []
+    seen=[]
     for i in inventory:
         if i not in seen:
             seen.append(i)
     return seen
 
 def get_food_value(name):
-    if "压缩口粮 x10" in name or "军用口粮 x10" in name: return 10
-    if "土豆干 x2" in name: return 2
-    if "压缩口粮 x1" in name: return 1
-    if name == "土豆干": return 1
-    if "土豆干 x10" in name: return 10
-    return 0
+    return FOOD_HUNGER.get(name, 0)
 
 def get_fuel_value(name):
     if "燃料桶 x20" in name: return 20
     if "燃料桶(半满)" in name: return 5
-    if name == "燃料桶": return 5
+    if name=="燃料桶": return 5
     return 0
 
 def sync_item(p, item_name, add=True):
     sign = 1 if add else -1
-    f = get_food_value(item_name)
     fu = get_fuel_value(item_name)
-    if f: p["food"] = max(0, p["food"] + f * sign)
     if fu: p["fuel"] = max(0, p["fuel"] + fu * sign)
 
 @app.route("/")
 def index():
     total = sum(p['km'] for p in players.values())
-    return f"Kettenkrad v20.1 FINAL x2 | {len(players)}人 {total}km | 2000km终点"
+    return f"Kettenkrad v21.2 FIX | {len(players)}人 {total}km | 3000km"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
 intents = discord.Intents.default()
+intents.guilds = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 SPECIAL_REWARDS = {
-    "尤莉的笑脸": {"text": "尤莉：嘿嘿~ 千户你看我笑得可爱吗？\n千户：...笨蛋。", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967112982663238/44b80e01a3f2b3cb9d0bb35479393411.jpg?ex=6ae330b3&is=6ae1df33&hm=f0847625bf118e334badacf391241518b4bbcc611c24ba28d41bc2febedd04f2&", "color": 0xf2c17c, "effect": "food+1"},
-    "尤莉的歌声": {"text": "尤莉：♪~ 拉拉拉~ 终末世界也要唱歌！", "image": None, "color": 0xf2c17c, "effect": "fuel+2"},
-    "尤莉的拥抱": {"text": "尤莉：千户，好冷啊，抱一下！\n千户：等等、太近了！", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564966003581128754/50.jpg?ex=6ae32faa&is=6ae1de2a&hm=fb7591952c82a057ddf76abf5f6848c4eb919b39a6c4d2ee62e52eacf38729d8&", "color": 0xf2c17c, "effect": "food+3"},
-    "日记(千户写的)": {"text": "千户的日记：今天尤莉又把枪弄丢了...明明只有一发子弹了", "image": None, "color": 0x8b9a7d, "effect": "none"},
-    "金泽的眼镜": {"text": "金泽：没有这个我看不清地图了...算了，送你吧。\n地图什么的，已经不重要了", "image": None, "color": 0x87ceeb, "effect": "none"},
-    "石像爷爷的刻刀": {"text": "石像爷爷：用这个刻，能刻得更久。\n...能被记住更久一点", "image": None, "color": 0xa9a9a9, "effect": "none"},
-    "管制官的密钥": {"text": "管制官：密钥已移交...工厂将永远运行。\n直到上层崩塌...", "image": None, "color": 0xff4444, "effect": "fuel+50"},
-    "发光的努可": {"text": "努可把子弹吃掉了，全身发光...\n尤莉：哇！发光了！\n效果：燃料充满", "image": None, "color": 0xffffff, "effect": "fuel_full"},
+    "尤莉的笑脸": {"text": "尤莉：嘿嘿~ 千户你看我笑得可爱吗？\n千户：...笨蛋。", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967112982663238/44b80e01a3f2b3cb9d0bb35479393411.jpg?ex=6ae330b3&is=6ae1df33&hm=f0847625bf118e334badacf391241518b4bbcc611c24ba28d41bc2febedd04f2&", "color": 0xf2c17c, "effect": "none"},
+    "尤莉的歌声": {"text": "尤莉：♪~ 拉拉拉~ 终末世界也要唱歌！", "image": None, "color": 0xf2c17c, "effect": "none"},
+    "尤莉的拥抱": {"text": "尤莉：千户，好冷啊，抱一下！", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564966003581128754/50.jpg?ex=6ae32faa&is=6ae1de2a&hm=fb7591952c82a057ddf76abf5f6848c4eb919b39a6c4d2ee62e52eacf38729d8&", "color": 0xf2c17c, "effect": "none"},
+    "日记(千户写的)": {"text": "千户的日记：今天尤莉又把枪弄丢了...", "image": None, "color": 0x8b9a7d, "effect": "none"},
+    "金泽的眼镜": {"text": "金泽：没有这个我看不清地图了...", "image": None, "color": 0x87ceeb, "effect": "none"},
+    "世界地图(残缺)": {"text": "金泽：这地图我画了半辈子...", "image": None, "color": 0x87ceeb, "effect": "none"},
+    "石像爷爷的刻刀": {"text": "石像爷爷：用这个刻，能刻得更久。", "image": None, "color": 0xa9a9a9, "effect": "none"},
+    "小地藏雕像": {"text": "石像爷爷：保佑你们的旅途。", "image": None, "color": 0xa9a9a9, "effect": "none"},
+    "飞机设计图": {"text": "石井：这架飞机本来想去上层的...", "image": None, "color": 0xdeb887, "effect": "none"},
+    "管制官的密钥": {"text": "管制官：密钥已移交...工厂将永远运行。", "image": None, "color": 0xff4444, "effect": "none"},
+    "发光的努可": {"text": "努可把子弹吃掉了，全身发光...", "image": None, "color": 0xffffff, "effect": "fuel_full"},
     "电能 x100": {"text": "努可：努可！ (释放100电能)", "image": None, "color": 0xffffff, "effect": "fuel+100"},
-    "星空的照片": {"text": "……嗯。\n\n千户：...好美。\n尤莉：这就是上层吗？\n—— 终末的星空", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae3d977&is=6ae287f7&hm=8e9c12b7b26a37f13e7088978dd3bdb0fb06612a955033c5a9f72a70e3972de6&", "color": 0x000000, "effect": "END"},
-    "END标记": {"text": "上面什么都没有了。\n但旅途本身，就是意义。\n—— 少女终末旅行 完", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564980687608483930/Screenshot_20261028_203421.jpg?ex=6ae3e617&is=6ae29497&hm=d4aebc9fdea69bcbcaaf74b9d3021744c174b3b23687afb66f587be4e4ef800f&", "color": 0x000000, "effect": "END"},
-    "小地藏雕像": {"text": "石像爷爷：保佑你们的旅途。\n尤莉：谢谢爷爷！", "image": None, "color": 0xa9a9a9, "effect": "none"},
-    "飞机设计图": {"text": "石井：这架飞机本来想去上层的...不过现在只能留在这里了", "image": None, "color": 0xdeb887, "effect": "none"},
-    "世界地图(残缺)": {"text": "金泽：这地图我画了半辈子...还是没画完啊", "image": None, "color": 0x87ceeb, "effect": "none"},
+    "星空的照片": {"text": "……嗯。\n千户：...好美。\n—— 终末的星空", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae3d977&is=6ae287f7&hm=8e9c12b7b26a37f13e7088978dd3bdb0fb06612a955033c5a9f72a70e3972de6&", "color": 0x000000, "effect": "END"},
+    "END标记": {"text": "上面什么都没有了。", "image": "https://cdn.discordapp.com/attachments/1519326691095478272/1564980687608483930/Screenshot_20261028_203421.jpg?ex=6ae3e617&is=6ae29497&hm=d4aebc9fdea69bcbcaaf74b9d3021744c174b3b23687afb66f587be4e4ef800f&", "color": 0x000000, "effect": "END"},
 }
 
 NPC_DIALOGUE = {
-    "金泽": "金泽：哦...又是旅人吗？\n千户：你是...在画地图？\n金泽：这个都市太大了，一辈子也画不完...\n尤莉：那要画到什么时候啊？\n金泽：...谁知道呢",
-    "石像爷爷": "石像爷爷：你们要去上层？\n尤莉：爷爷你在刻什么？\n石像爷爷：地藏...保佑旅人...\n千户：...谢谢",
-    "石井": "石井：我的飞机...本来想飞到上层去的\n尤莉：好厉害！会飞吗？\n石井：飞不了了...引擎坏了\n千户：...是这样啊",
-    "管制官": "管制官：...你们不是工厂的人吧？\n千户：工厂...还在运行吗？\n管制官：嗯，永远都会运行下去...直到上层崩塌\n尤莉：永远...？",
-    "努可": "努可：努可！\n尤莉：哇！白白的！好可爱！\n千户：...它把子弹吃掉了\n尤莉：啊！我的子弹！",
+    "金泽": "金泽：哦...又是旅人吗？",
+    "石像爷爷": "石像爷爷：你们要去上层？",
+    "石井": "石井：我的飞机...本来想飞到上层去的",
+    "管制官": "管制官：...你们不是工厂的人吧？",
+    "努可": "努可：努可！\n尤莉：哇！白白的！好可爱！",
 }
 
 ALL_NPCS = {
-    "金泽": {"color": 0x87ceeb, "km_need": 100},
-    "石像爷爷": {"color": 0xa9a9a9, "km_need": 300},
-    "石井": {"color": 0xdeb887, "km_need": 600},
-    "管制官": {"color": 0xff4444, "km_need": 1000},
-    "努可": {"color": 0xffffff, "km_need": 1400},
+    "金泽": {"color": 0x87ceeb, "km_need": 150},
+    "石像爷爷": {"color": 0xa9a9a9, "km_need": 450},
+    "石井": {"color": 0xdeb887, "km_need": 900},
+    "管制官": {"color": 0xff4444, "km_need": 1500},
+    "努可": {"color": 0xffffff, "km_need": 2100},
     "尤莉": {"color": 0xf2c17c, "km_need": 0},
     "千户": {"color": 0x8b9a7d, "km_need": 0},
-    "上层的幽灵": {"color": 0x000000, "km_need": 2000},
+    "上层的幽灵": {"color": 0x000000, "km_need": 3000},
 }
 
 DROP_TABLE = {
@@ -145,20 +145,14 @@ DROP_TABLE = {
 
 RANDOM_LOOT = [
     ("生锈的螺栓", 15, "尤莉：这是什么？能吃吗？\n千户：不能"), 
-    ("空罐头", 15, "尤莉：空的...什么都没有\n千户：早就被吃光了"),
-    ("旧报纸", 10, "千户：...都是几百年前的新闻了"),
-    ("破布", 8, "尤莉：破的...不能当毛毯了"), 
-    ("发光的石头", 2, "尤莉：哇！会发光！\n千户：...只是普通的石头"),
-    ("38式步枪子弹 x5", 7, "尤莉：子弹！\n千户：...38式的，已经不能用了"),
+    ("空罐头", 15, "尤莉：空的..."),
+    ("旧报纸", 10, "千户：...几百年前的新闻了"),
+    ("破布", 8, "尤莉：破的..."), 
+    ("发光的石头", 2, "尤莉：哇！会发光！"),
+    ("38式步枪子弹 x5", 7, "尤莉：子弹！"),
 ]
 
-ALL_ITEMS_POOL = [
-    "压缩口粮 x10", "压缩口粮 x1", "土豆干", "土豆干 x2", "军用口粮 x10", "燃料桶 x20", "燃料桶(半满)",
-    "生锈的螺栓", "空罐头", "旧报纸", "破布", "发光的石头", "38式步枪子弹 x5", "空弹壳", "被吃掉的子弹",
-    "手绘地图碎片", "世界地图(残缺)", "金泽的眼镜", "小地藏雕像", "石像 x10", "石像爷爷的刻刀",
-    "飞机设计图", "螺旋桨碎片", "管制官的密钥", "日记(千户写的)", "修理工具", "旧式相机胶卷",
-    "尤莉的笑脸", "尤莉的歌声", "尤莉的拥抱", "发光的努可", "电能 x100", "星空的照片", "END标记"
-]
+ALL_ITEMS_POOL = list(set(list(FOOD_HUNGER.keys()) + ["燃料桶 x20","燃料桶(半满)","生锈的螺栓","空罐头","旧报纸","破布","发光的石头","38式步枪子弹 x5","空弹壳","手绘地图碎片","世界地图(残缺)","金泽的眼镜","小地藏雕像","石像 x10","石像爷爷的刻刀","飞机设计图","螺旋桨碎片","管制官的密钥","日记(千户写的)","修理工具","旧式相机胶卷","尤莉的笑脸","尤莉的歌声","尤莉的拥抱","发光的努可","电能 x100","星空的照片","END标记"]))
 
 def roll(npc):
     table = DROP_TABLE.get(npc, [("垃圾", 100)]); r=random.randint(1,100); cur=0
@@ -170,57 +164,129 @@ def roll(npc):
 def get_player(uid):
     if uid not in players:
         players[uid] = {
-            "km":0,"food":2,"fuel":28,"step":0,"visited_airplane":False,"ended":False,
-            "bike_scrapped":False,"bath_to_delete":False,"endless":False,
+            "km":0,"hunger":100,"fuel":28,"step":0,"visited_airplane":False,"ended":False,
+            "bike_scrapped":False,"bath_to_delete":False,"endless":False,"pause_until":0,
             "met_npcs":set(["千户","尤莉"]),
             "ever_met":set(["千户","尤莉"]),
             "npc_met_km":{"千户":0,"尤莉":0},
-            "inventory":["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
+            "inventory":["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"]
         }
         save_now()
-    for k,v in [("bike_scrapped",False),("bath_to_delete",False),("endless",False)]:
-        if k not in players[uid]: players[uid][k]=v
-    if "ever_met" not in players[uid]: players[uid]["ever_met"] = set(players[uid]["met_npcs"])
-    if "npc_met_km" not in players[uid]: players[uid]["npc_met_km"] = {}
-    return players[uid]
+    p = players[uid]
+    # ===== FIX 1 旧存档兼容 =====
+    if "hunger" not in p or p["hunger"] is None:
+        p["hunger"] = 100
+    if "food" in p:
+        del p["food"]
+    if "bike_scrapped" not in p: p["bike_scrapped"]=False
+    if "bath_to_delete" not in p: p["bath_to_delete"]=False
+    if "endless" not in p: p["endless"]=False
+    if "pause_until" not in p: p["pause_until"]=0
+    if "ever_met" not in p: p["ever_met"]=set(p["met_npcs"])
+    if "npc_met_km" not in p: p["npc_met_km"]={}
+    return p
+
+def is_paused(p):
+    return time.time() < p.get("pause_until",0)
+
+# ===== FIX 2 + FIX 4 =====
+class FoodUseSelect(discord.ui.Select):
+    def __init__(self, user_id, inventory):
+        self.user_id = user_id
+        foods = [i for i in inventory if get_food_value(i) > 0]
+        unique = []
+        for f in foods:
+            if f not in unique:
+                unique.append(f)
+        if not unique:
+            options = [discord.SelectOption(label="没有食物", value="none")]
+        else:
+            _, counter = format_backpack(inventory)
+            options = []
+            for item in unique[:25]:
+                add = get_food_value(item)
+                cnt = counter[item]
+                label = f"{item} (+{add}%)" + (f" x{cnt}" if cnt>1 else "")
+                options.append(discord.SelectOption(label=label[:100], value=item, description=f"恢复 {add}% 饥饿度"))
+        super().__init__(placeholder="🍙 选择食物使用", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ 不是你的背包", ephemeral=True); return
+        if self.values[0] == "none":
+            await interaction.response.send_message("❌ 没有食物", ephemeral=True); return
+        item_name = self.values[0]
+        p = get_player(self.user_id)
+        if item_name not in p["inventory"]:
+            await interaction.response.send_message("❌ 食物已不在背包", ephemeral=True); return
+        add = get_food_value(item_name)
+        p["inventory"].remove(item_name)
+        p["hunger"] = min(100, p["hunger"] + add)
+        save_now()
+        # FIX 2 自动刷新公开Embed
+        try:
+            embed = interaction.message.embeds[0] if interaction.message.embeds else discord.Embed(title="背包")
+            # 更新标题里的饥饿度
+            if hasattr(embed, 'author') and embed.author.name:
+                embed.set_author(name=f"{p['km']}km | 饥饿{p['hunger']}% 燃料{p['fuel']}% | 吃了 {item_name}")
+            else:
+                embed.title = f"{p['km']}km 背包 - {p['hunger']}%饥饿 {p['fuel']}燃料 - 刚吃 {item_name} +{add}%"
+            new_view = WalkView(self.user_id)
+            await interaction.response.edit_message(embed=embed, view=new_view)
+        except:
+            await interaction.response.send_message(embed=discord.Embed(title=f"🍙 吃了 {item_name}", description=f"饥饿度 +{add}% -> 现在 {p['hunger']}%", color=0x8b9a7d), ephemeral=True)
+
+class WalkView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=None) # FIX 4 永不过期
+        self.user_id = user_id
+        p = get_player(user_id)
+        self.add_item(FoodUseSelect(user_id, p["inventory"]))
+    @discord.ui.button(label="继续步行 (-5%饥饿)", style=discord.ButtonStyle.primary, emoji="🚶")
+    async def continue_walk(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ 不是你的旅途", ephemeral=True); return
+        p = get_player(interaction.user.id)
+        if is_paused(p):
+            left = int(p["pause_until"] - time.time())
+            await interaction.response.send_message(f"⏸️ 暂停中，还剩 {left}秒", ephemeral=True); return
+        await interaction.response.defer()
+        await do_walk_logic(interaction)
+    @discord.ui.button(label="暂停前进", style=discord.ButtonStyle.secondary, emoji="⏸️")
+    async def pause_walk(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id: return
+        p = get_player(interaction.user.id)
+        p["pause_until"] = time.time() + 300
+        save_now()
+        await interaction.response.edit_message(embed=discord.Embed(title="⏸️ 已暂停前进 5分钟", color=0x555555), view=ResumeView(self.user_id))
+
+class ResumeView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+        p = get_player(user_id)
+        self.add_item(FoodUseSelect(user_id, p["inventory"]))
+    @discord.ui.button(label="恢复前进", style=discord.ButtonStyle.success, emoji="▶️")
+    async def resume(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id: return
+        p = get_player(interaction.user.id)
+        p["pause_until"] = 0
+        save_now()
+        await interaction.response.edit_message(embed=discord.Embed(title="▶️ 已恢复", color=0x8b9a7d), view=WalkView(self.user_id))
 
 class EndlessConfirmView(discord.ui.View):
     def __init__(self, user_id, to_endless: bool):
         super().__init__(timeout=60)
-        self.user_id = user_id
-        self.to_endless = to_endless
+        self.user_id = user_id; self.to_endless = to_endless
     @discord.ui.button(label="确定", style=discord.ButtonStyle.danger, emoji="⚠️")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ 不是你的存档", ephemeral=True); return
-        if self.to_endless:
-            players[interaction.user.id] = {
-                "km": 0, "food": 6, "fuel": 38, "step": 0,
-                "visited_airplane": False, "ended": False,
-                "bike_scrapped": False, "bath_to_delete": False, "endless": True,
-                "met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
-                "ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
-                "npc_met_km": {"千户":0,"尤莉":0},
-                "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"]
-            }
-            save_now()
-            await interaction.response.edit_message(embed=discord.Embed(title="♾️ 无尽模式 已开启", description="普通进度已清除。\n初始6食物38燃料 / 0km\nKettenkrad永不报废，旅途没有终点", color=0x00ffaa), view=None)
-        else:
-            players[interaction.user.id] = {
-                "km": 0, "food": 2, "fuel": 28, "step": 0,
-                "visited_airplane": False, "ended": False,
-                "bike_scrapped": False, "bath_to_delete": False, "endless": False,
-                "met_npcs": set(["千户","尤莉"]),
-                "ever_met": set(["千户","尤莉"]),
-                "npc_met_km": {"千户":0,"尤莉":0},
-                "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
-            }
-            save_now()
-            await interaction.response.edit_message(embed=discord.Embed(title="返回普通模式", description="无尽进度已清除，回到0km普通旅途。\n2食物28燃料", color=0x8b9a7d), view=None)
-    @discord.ui.button(label="取消", style=discord.ButtonStyle.secondary, emoji="✖️")
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
-        await interaction.response.edit_message(embed=discord.Embed(title="已取消", description="没有改变。", color=0x555555), view=None)
+        if self.to_endless:
+            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": True, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"]}
+        else:
+            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"]}
+        save_now()
+        await interaction.response.edit_message(embed=discord.Embed(title="已切换", color=0x00ffaa), view=None)
 
 class RestartView(discord.ui.View):
     def __init__(self, user_id):
@@ -228,17 +294,9 @@ class RestartView(discord.ui.View):
     @discord.ui.button(label="重新开始", style=discord.ButtonStyle.primary, emoji="🔄")
     async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
-        players[interaction.user.id] = {
-            "km": 0, "food": 2, "fuel": 28, "step": 0,
-            "visited_airplane": False, "ended": False,
-            "bike_scrapped": False,"bath_to_delete": False,"endless": False,
-            "met_npcs": set(["千户","尤莉"]),
-            "ever_met": set(["千户","尤莉"]),
-            "npc_met_km": {"千户":0,"尤莉":0},
-            "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
-        }
+        players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False,"bath_to_delete": False,"endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"]}
         save_now()
-        await interaction.response.edit_message(embed=discord.Embed(title="🔄 旅途重新开始", description="0km / 2000km", color=0x8b9a7d), view=None)
+        await interaction.response.edit_message(embed=discord.Embed(title="🔄 重新开始 0km 饥饿100%", color=0x8b9a7d), view=None)
 
 class TradeView(discord.ui.View):
     def __init__(self, from_id, to_id=None, npc_name=None, inventory=None):
@@ -248,101 +306,78 @@ class TradeView(discord.ui.View):
         if not inv: return
         _, counter = format_backpack(inv)
         unique = get_unique_for_trade(inv)
-        opts = []
-        for idx, item in enumerate(unique[:25]):
-            cnt = counter[item]
-            label = f"{item} (x{cnt})" if cnt > 1 else item
-            opts.append(discord.SelectOption(label=label[:100], value=f"{idx}|{item}"))
-        self.select_give = discord.ui.Select(placeholder=f"选择物品 - 共{len(inv)}件 {len(unique)}种", min_values=1, max_values=1, options=opts)
+        opts = [discord.SelectOption(label=f"{item} (x{counter[item]})"[:100] if counter[item]>1 else item[:100], value=f"{idx}|{item}") for idx, item in enumerate(unique[:25])]
+        self.select_give = discord.ui.Select(placeholder=f"选择物品 共{len(inv)}件", min_values=1, max_values=1, options=opts)
         self.select_give.callback = self.select_callback
         self.add_item(self.select_give)
     async def select_callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.from_id:
-            await interaction.response.send_message("❌ 不是你的交易", ephemeral=True); return
+        if interaction.user.id != self.from_id: return
         _, item_name = self.select_give.values[0].split("|", 1)
         self.offer = item_name
         await interaction.response.send_message(f"已选择：**{self.offer}**", ephemeral=True)
     @discord.ui.button(label="确认交易", style=discord.ButtonStyle.success, emoji="🤝")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.from_id: return
-        if not self.offer:
-            await interaction.response.send_message("❌ 请先选择一个物品", ephemeral=True); return
+        if not self.offer: return
         p = get_player(self.from_id)
-        if self.offer not in p["inventory"]: 
-            await interaction.response.send_message("❌ 物品已不在背包", ephemeral=True); return
+        if self.offer not in p["inventory"]: return
         sync_item(p, self.offer, add=False)
         if self.npc_name:
             reward = roll(self.npc_name)
             p["inventory"].remove(self.offer); p["inventory"].append(reward); sync_item(p, reward, add=True)
             sp = SPECIAL_REWARDS.get(reward)
             if sp:
-                if sp["effect"]=="food+1": p["food"]+=1
-                if sp["effect"]=="food+3": p["food"]+=3
-                if sp["effect"]=="fuel+2": p["fuel"]+=2
-                if sp["effect"]=="fuel+50": p["fuel"]+=50
-                if sp["effect"]=="fuel+100": p["fuel"]+=100
                 if sp["effect"]=="fuel_full": p["fuel"]=999
-                emb=discord.Embed(title=f"✨ {reward}", description=f"{sp['text']}\n\n{self.offer} -> {reward}\n现在 食物{p['food']} 燃料{p['fuel']}", color=sp["color"])
-                if sp["image"]: emb.set_image(url=sp["image"])
-            else:
-                emb=discord.Embed(title=f"与 {self.npc_name} 交易", description=f"{self.offer} -> {reward}\n现在 食物{p['food']} 燃料{p['fuel']}", color=ALL_NPCS[self.npc_name]["color"])
+                if sp["effect"]=="fuel+100": p["fuel"]+=100
+                if sp["effect"]=="END": p["ended"]=True
+            emb=discord.Embed(title=f"✨ {reward}", description=f"{SPECIAL_REWARDS[reward]['text']}\n\n{self.offer} -> {reward}\n现在 饥饿{p['hunger']}% 燃料{p['fuel']}", color=SPECIAL_REWARDS[reward]["color"] if reward in SPECIAL_REWARDS else ALL_NPCS[self.npc_name]["color"])
+            if reward in SPECIAL_REWARDS and SPECIAL_REWARDS[reward].get("image"): emb.set_image(url=SPECIAL_REWARDS[reward]["image"])
             await interaction.response.edit_message(embed=emb, view=None)
         else:
             target = get_player(self.to_id); target["inventory"].append(self.offer); sync_item(target, self.offer, add=True); p["inventory"].remove(self.offer)
-            await interaction.response.edit_message(embed=discord.Embed(title="交易完成", description=f"把 {self.offer} 给了 {interaction.client.get_user(self.to_id)}"), view=None)
+            await interaction.response.edit_message(embed=discord.Embed(title="交易完成"), view=None)
         save_now()
 
 class GiveView(discord.ui.View):
     def __init__(self, user_id, inventory):
         super().__init__(timeout=120)
-        self.user_id = user_id
-        self.offer = None
-        inv = inventory or []
-        unique = get_unique_for_trade(inv)
-        opts = []
-        for idx, item in enumerate(unique[:25]):
-            opts.append(discord.SelectOption(label=item[:100], value=f"{idx}|{item}"))
-        self.select_give = discord.ui.Select(placeholder=f"选择要给予的物品", min_values=1, max_values=1, options=opts)
+        self.user_id = user_id; self.offer=None
+        unique = get_unique_for_trade(inventory)
+        opts = [discord.SelectOption(label=item[:100], value=f"{idx}|{item}") for idx, item in enumerate(unique[:25])]
+        self.select_give = discord.ui.Select(placeholder="选择要给予的物品", min_values=1, max_values=1, options=opts)
         self.select_give.callback = self.select_callback
         self.add_item(self.select_give)
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.user_id: return
         _, item_name = self.select_give.values[0].split("|", 1)
-        self.offer = item_name
+        self.offer=item_name
         await interaction.response.send_message(f"已选择：**{self.offer}**", ephemeral=True)
     @discord.ui.button(label="确认给予", style=discord.ButtonStyle.success, emoji="🎁")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
-        if not self.offer:
-            await interaction.response.send_message("❌ 请先选择", ephemeral=True); return
         p = get_player(self.user_id)
-        p["inventory"].append(self.offer)
-        sync_item(p, self.offer, add=True)
+        p["inventory"].append(self.offer); sync_item(p, self.offer, add=True)
         save_now()
-        await interaction.response.edit_message(embed=discord.Embed(title="DEV给予成功", description=f"已获得 {self.offer}\n现在 食物{p['food']} 燃料{p['fuel']}", color=0xffd700), view=None)
+        await interaction.response.edit_message(embed=discord.Embed(title="DEV给予成功", description=f"已获得 {self.offer}\n饥饿{p['hunger']}% 燃料{p['fuel']}", color=0xffd700), view=None)
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f"Kettenkrad v20.1 | 已在 {len(bot.guilds)} 个服务器 | 2000km终点")
+    print(f"v21.2 FIX | {len(bot.guilds)}服")
 
-@bot.event
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     me = guild.get_member(bot.user.id) or guild.me
     inviter = None
-    
-    # 1. 尝试找邀请者
     try:
         if me and me.guild_permissions.view_audit_log:
             async for entry in guild.audit_logs(limit=10, action=discord.AuditLogAction.bot_add):
                 if entry.target and entry.target.id == bot.user.id:
                     inviter = entry.user
                     break
-    except Exception as e:
-        print(f"[INVITE] 找不到邀请者: {e}")
+    except:
+        pass
 
-    # 2. 拿群主
     owner = guild.owner
     if owner is None:
         try:
@@ -356,23 +391,23 @@ async def on_guild_join(guild: discord.Guild):
     embed = discord.Embed(
         title="📮 Kettenkrad 已加入 - 少女终末旅行",
         description=(
-            f"感谢邀请！Kettenkrad履带摩托已抵达 **{guild.name}**\n\n"
+            f"Kettenkrad已抵达 **{guild.name}**\n\n"
             f"**邀请者：** {inviter.mention if inviter else '未知'}\n"
             f"**群主：** {owner.mention if owner else f'<@{guild.owner_id}>'}\n\n"
-            f"**玩法：**\n"
-            f"`/步行` 开始2000km的终末之旅 [有油3-6km/无油1-2km/1700报废后1-3km]\n"
-            f"`/背包` 查看物资\n"
+            f"**玩法：**\n\n
+            f"`/步行` 开始3000km终末之旅 [每步-5%饥饿]\n"
+            f"`/背包` 查看物资 + 食物下拉\n"
             f"`/交易` 与旅人交换\n"
             f"`/无尽模式` 无尽荒野,永无终点\n\n"
-            f"⚠️ *此邀请提示仅私信邀请者和群主*"
+            f"⚠️ *仅私信邀请者和群主*"
         ),
         color=0x8b9a7d
     )
     embed.set_image(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080159318186/images_29.jpg?ex=6ae4365f&is=6ae2e4df&hm=e3239513b76357c43ee23bacd20f25c1505c1bd075f1e4784c0bfe78edaf9d1e&")
     embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565248080620556398/-9lddQ5-j03nZ2mT3cSzk-k0.png?ex=6ae4365f&is=6ae2e4df&hm=12ba71765e1f6b7fc46de52c4db4c0a9c42fe12598a0090bf39894f2be666b0c&")
-    embed.set_footer(text=f"0km起点 2食物28燃料 | 由 {inviter.display_name if inviter else '旅人'} 邀请")
+    embed.set_footer(text=f"0km 饥饿度100% | 由 {inviter.display_name if inviter else '旅人'} 邀请")
 
-    # 3. 群里发一份
+    # 发到服务器
     try:
         send_channel = guild.system_channel
         if not send_channel:
@@ -382,86 +417,80 @@ async def on_guild_join(guild: discord.Guild):
                     break
         if send_channel:
             await send_channel.send(embed=embed)
-    except Exception as e:
-        print(f"[GUILD SEND] 失败: {e}")
+    except:
+        pass
 
-    # 4. 只私信邀请者 + 群主
-    dm_targets = []
-    if inviter and not inviter.bot:
-        dm_targets.append(inviter)
-    if owner and not owner.bot and (not inviter or owner.id != inviter.id):
-        dm_targets.append(owner)
+    # 只私信邀请者和群主
+    seen = set()
+    dm_list = []
+    for u in [inviter, owner]:
+        if u and not u.bot and u.id not in seen:
+            seen.add(u.id)
+            dm_list.append(u)
 
-    print(f"[JOIN] {guild.name} 邀请者:{inviter} 群主:{owner} 准备私信{len(dm_targets)}人")
-
-    for user in dm_targets:
+    for user in dm_list:
         try:
             await user.send(embed=embed)
-            print(f"[DM] 已私信 {user} ({user.id})")
-        except Exception as e:
-            print(f"[DM] 私信 {user} 失败: {e} (可能是对方关了私信)")
+        except:
+            pass
 
 @bot.tree.command(name="开发者", description="开发者模式[仅限]")
 async def 开发者(interaction: discord.Interaction):
-    if interaction.user.id not in DEV_IDS: await interaction.response.send_message("❌ 你不是开发者", ephemeral=True); return
+    if interaction.user.id not in DEV_IDS: await interaction.response.send_message("❌ 不是开发者", ephemeral=True); return
     if interaction.user.id in dev_mode_users:
         dev_mode_users.remove(interaction.user.id); await interaction.response.send_message(embed=discord.Embed(title="DEV 已关闭", color=0xff0000))
     else:
         dev_mode_users.add(interaction.user.id); d=get_player(interaction.user.id); 
-        for k in ALL_NPCS.keys(): 
-            d["met_npcs"].add(k); d["ever_met"].add(k); d["npc_met_km"][k]=d["km"]
-        await interaction.response.send_message(embed=discord.Embed(title="DEV 已开启", description="已解锁所有NPC", color=0xffd700))
+        for k in ALL_NPCS.keys(): d["met_npcs"].add(k); d["ever_met"].add(k); d["npc_met_km"][k]=d["km"]
+        await interaction.response.send_message(embed=discord.Embed(title="DEV 已开启", color=0xffd700))
     save_now()
 
-@bot.tree.command(name="跳跃", description="开发者跳跃[仅限]")
+@bot.tree.command(name="跳跃", description="开发者跳跃")
 async def 跳跃(interaction: discord.Interaction, km: int):
     if interaction.user.id not in dev_mode_users: await interaction.response.send_message("❌ 需先 /开发者", ephemeral=True); return
     d=get_player(interaction.user.id); d["km"]=km; d["step"]+=1; save_now()
     await interaction.response.send_message(embed=discord.Embed(title="DEV跳跃", description=f"已到 {km}km", color=0xffd700))
 
-@bot.tree.command(name="给予", description="开发者给予[白嫖]")
+@bot.tree.command(name="给予", description="开发者给予")
 async def 给予(interaction: discord.Interaction):
     if interaction.user.id not in dev_mode_users: await interaction.response.send_message("❌ 需先 /开发者", ephemeral=True); return
-    await interaction.response.send_message(embed=discord.Embed(title="DEV给予 - 直接获得"), view=GiveView(interaction.user.id, inventory=ALL_ITEMS_POOL), ephemeral=True)
+    await interaction.response.send_message(embed=discord.Embed(title="DEV给予"), view=GiveView(interaction.user.id, inventory=ALL_ITEMS_POOL), ephemeral=True)
 
 @bot.tree.command(name="无尽模式", description="开启/关闭无尽模式")
 async def 无尽模式(interaction: discord.Interaction):
     d = get_player(interaction.user.id)
     if not d.get("endless", False):
-        embed = discord.Embed(title="♾️ 开启无尽模式？", description=f"你现在 {d['km']}km\n\n⚠️ **如果开启无尽模式，你当前的进度会消失，你确定开启吗？**", color=0xff8800)
-        await interaction.response.send_message(embed=embed, view=EndlessConfirmView(interaction.user.id, to_endless=True), ephemeral=True)
+        await interaction.response.send_message(embed=discord.Embed(title="♾️ 开启无尽模式？", description="⚠️ 进度会消失", color=0xff8800), view=EndlessConfirmView(interaction.user.id, True), ephemeral=True)
     else:
-        embed = discord.Embed(title="返回普通模式？", description=f"你现在无尽模式 {d['km']}km\n\n⚠️ **如果返回普通模式，你当前的无尽进度会消失，你确定吗？**", color=0xff8800)
-        await interaction.response.send_message(embed=embed, view=EndlessConfirmView(interaction.user.id, to_endless=False), ephemeral=True)
+        await interaction.response.send_message(embed=discord.Embed(title="返回普通模式？", description="⚠️ 无尽进度消失", color=0xff8800), view=EndlessConfirmView(interaction.user.id, False), ephemeral=True)
 
-@bot.tree.command(name="步行", description="步行2000km到上层")
-async def 步行(interaction: discord.Interaction):
+async def do_walk_logic(interaction: discord.Interaction):
     data = get_player(interaction.user.id)
     is_dev_now = interaction.user.id in dev_mode_users
     is_endless = data.get("endless", False)
-
-    if data["ended"] and not is_dev_now and not is_endless:
-        embed = discord.Embed(title="—— 2000km，终点", description="你们已经在终点了。\n我们现在是世界上最幸福的人。", color=0x000000)
-        await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id), ephemeral=True)
-        return
-
     prev_km = data["km"]
 
     if not is_endless:
         expired = []
         for npc_name in list(data["met_npcs"]):
             if npc_name in ["千户","尤莉"]: continue
-            met_km = data["npc_met_km"].get(npc_name, 0)
-            if data["km"] - met_km > 15:
-                data["met_npcs"].discard(npc_name)
-                expired.append(npc_name)
+            if data["km"] - data["npc_met_km"].get(npc_name, 0) > 15:
+                data["met_npcs"].discard(npc_name); expired.append(npc_name)
         if expired and random.random() < 0.3:
             save_now()
-            await interaction.response.send_message(embed=discord.Embed(title=f"{expired[0]} 离开了", description=f"{expired[0]}：我要继续我的旅途了...保重", color=0x555555))
+            await interaction.followup.send(embed=discord.Embed(title=f"{expired[0]} 离开了", color=0x555555), view=WalkView(interaction.user.id))
             return
 
     data["step"] += 1
     has_bike = any("Kettenkrad" in i or "履带摩托" in i for i in data["inventory"])
+
+    # ===== 第几步触发事件 =====
+    if data["step"] == 5 and not is_endless:
+        save_now()
+        embed = discord.Embed(title="📍 看到了夜晚的月光 ", description="尤莉：哇！是星空耶！\n千户：嗯！\n尤莉：快看那个星星！", color=0x8b9a7d)
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565373186659328020/Screenshot_20261029_215400_com.android.chrome_edit_193629864750661.jpg?ex=6ae4aae2&is=6ae35962&hm=9ec2dd36a7f71b4441e19652001fb6827ba9ea8d667913e1f034ca10b3518e55&")
+        await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id))
+        return
 
     if data.get("bath_to_delete", False) and not is_endless:
         data["bath_to_delete"] = False
@@ -469,184 +498,128 @@ async def 步行(interaction: discord.Interaction):
             if "Kettenkrad浴缸" in data["inventory"][i]:
                 del data["inventory"][i]; break
         save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="留在1700km", description="你们把Kettenkrad浴缸留在了1700km，继续徒步向上。\n尤莉：再见了，浴缸...", color=0x555555))
+        await interaction.followup.send(embed=discord.Embed(title="留在2550km", color=0x555555), view=WalkView(interaction.user.id))
         return
 
-    # === 移速规则 v20.1 ===
     if is_endless:
-        if not is_dev_now:
-            if not has_bike or data["fuel"] <= 0:
-                move = random.randint(1, 2)
-            else:
-                move = random.randint(4, 7)
-        else:
-            move = random.randint(4, 7) if has_bike else random.randint(1, 2)
+        move = random.randint(1, 2) if (not has_bike or data["fuel"] <= 0) else random.randint(4, 7)
     else:
-        if not is_dev_now:
-            if not has_bike:
-                move = random.randint(1, 3) if data.get("bike_scrapped") else random.randint(1, 2)
-            elif data["fuel"] <= 0:
-                move = random.randint(1, 2)
-            else:
-                move = random.randint(3, 6)
+        if not has_bike:
+            move = random.randint(1, 3) if data.get("bike_scrapped") else random.randint(1, 2)
+        elif data["fuel"] <= 0:
+            move = random.randint(1, 2)
         else:
-            move = random.randint(3, 6) if has_bike else random.randint(1, 3)
+            move = random.randint(3, 6)
 
     data["km"] += move
 
-    if data["step"] == 2 and not data["visited_airplane"] and not is_endless:
-        data["visited_airplane"] = True; data["food"] += 10
+    if data["step"] == 20 and not data["visited_airplane"] and not is_endless:
+        data["visited_airplane"] = True
         data["inventory"].extend(["压缩口粮 x10", "生锈的仪表盘"]); save_now()
-        embed = discord.Embed(title="📍 发现报废战斗机", description="千户：这里有...战斗机？\n尤莉：能飞吗？\n千户：...早就飞不了了\n\n获得：压缩口粮 x10", color=0x8b9a7d)
+        embed = discord.Embed(title="📍 发现报废战斗机", description="尤莉：是飞机耶！\n千户：那是战斗机\n尤莉：诶...他还能飞吗\n千户：已经不能了....走，我们进去看有没有粮食\n获得：压缩口粮 x10 (+100%)", color=0x8b9a7d)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565001787013079181/Screenshot_20261028_215740.jpg?ex=6ae350fe&is=6ae1ff7e&hm=05633f8ece6e2427381e954f716cd583f21d6475e1790309ffb16730fd534a6c&")
-        await interaction.response.send_message(embed=embed); return
+        await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id)); return
 
     if not is_dev_now:
-        data["food"] -= 1
+        if data["step"] > 10:
+            data["hunger"] = max(0, data["hunger"] - 5)
         if data["fuel"] > 0:
             data["fuel"] = max(0, data["fuel"] - 1)
-        if data["food"] <= 0:
-            was_endless = data.get("endless", False)
-            if was_endless:
-                players[interaction.user.id] = {
-                    "km": 0, "food": 6, "fuel": 38, "step": 0,
-                    "visited_airplane": False, "ended": False,
-                    "bike_scrapped": False, "bath_to_delete": False, "endless": True,
-                    "met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
-                    "ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
-                    "npc_met_km": {"千户":0,"尤莉":0},
-                    "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"]
-                }
-                save_now()
-                await interaction.response.send_message(embed=discord.Embed(title="♾️ 饿死了... 无尽旅途结束", description="在无尽荒野中倒下...\n已重置为无尽起点 6食物38燃料 / 0km", color=0x000000))
-            else:
-                players[interaction.user.id] = {
-                    "km": 0, "food": 2, "fuel": 28, "step": 0,
-                    "visited_airplane": False, "ended": False,
-                    "bike_scrapped": False, "bath_to_delete": False, "endless": False,
-                    "met_npcs": set(["千户","尤莉"]),
-                    "ever_met": set(["千户","尤莉"]),
-                    "npc_met_km": {"千户":0,"尤莉":0},
-                    "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2"]
-                }
-                save_now()
-                await interaction.response.send_message(embed=discord.Embed(title="饿死了...", description="旅途结束了...\n已重置为普通起点 2食物28燃料 / 0km", color=0x000000))
+        if data["hunger"] <= 0:
+            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38 if is_endless else 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": is_endless, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"] if is_endless else ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"]}
+            save_now()
+            await interaction.followup.send(embed=discord.Embed(title="💀 饿死了...", description=f"饥饿度0%倒下... 已重置 饥饿100% / 0km", color=0x000000), view=WalkView(interaction.user.id))
             return
 
-    if not is_endless and prev_km < 1100 <= data["km"]:
-        save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="⚠️ 进入中层 - 1100km", description="千户：补给越来越少了...\n尤莉：啊...土豆也没了...", color=0xff8800)); return
-    if not is_endless and prev_km < 1500 <= data["km"]:
-        save_now()
-        await interaction.response.send_message(embed=discord.Embed(title="☠️ 进入上层 - 1500km", description="千户：真正的上层...什么都没有了\n尤莉：...有点可怕", color=0x111111)); return
-
-    if not is_endless and not data.get("bike_scrapped", False) and (prev_km < 1700 <= data["km"] or (data["km"] >= 1700 and has_bike)):
+    if not is_endless and prev_km < 1650 <= data["km"]:
+        save_now(); await interaction.followup.send(embed=discord.Embed(title="⚠️ 进入中层 - 1650km", color=0xff8800), view=WalkView(interaction.user.id)); return
+    if not is_endless and prev_km < 2250 <= data["km"]:
+        save_now(); await interaction.followup.send(embed=discord.Embed(title="☠️ 进入上层 - 2250km", color=0x111111), view=WalkView(interaction.user.id)); return
+    if not is_endless and not data.get("bike_scrapped", False) and (prev_km < 2550 <= data["km"] or (data["km"] >= 2550 and has_bike)):
         data["bike_scrapped"] = True; data["bath_to_delete"] = True
         for i in range(len(data["inventory"])-1, -1, -1):
             if "Kettenkrad" in data["inventory"][i] or "履带摩托" in data["inventory"][i]:
                 del data["inventory"][i]; break
         data["inventory"].append("Kettenkrad浴缸"); save_now()
-        embed = discord.Embed(title="💥 Kettenkrad 报废 - 1700km", description="嘎吱...砰。\n\n千户：...不动了。\n尤莉：修一下就好了吧？\n千户：...履带断了，引擎也烧死了。修不了了。\n尤莉：...\n\n千户：它陪我们走了1700km啊...\n尤莉：一直以为它会陪我们到上层的...\n\n沉默了很久。\n\n尤莉：千户...我们把它当浴缸吧。\n尤莉：这样...它还能再陪我们一下。\n千户：嗯。\n\n热水倒进Kettenkrad的车斗里。\n嗚啊——\n\n尤莉：最后的热水澡啊...\n千户：明明这么暖和...为什么有点想哭。\n\n—— Kettenkrad报废了\n获得：Kettenkrad浴缸\n下一次步行后，浴缸会留在原地。", color=0x555555)
+        embed = discord.Embed(title="💥 Kettenkrad 报废 - 2550km", color=0x555555)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565030660282912889/082.jpg.webp?ex=6ae36be2&is=6ae21a62&hm=53dcefc67ca4022ed391d055e673eb9cbc707d0c9e659f326b9e95bd2d257c4b&")
-        await interaction.response.send_message(embed=embed); return
-
-    if not is_endless and data["km"] >= 2000 and not data["ended"]:
+        await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id)); return
+    if not is_endless and data["km"] >= 3000 and not data["ended"]:
         data["ended"] = True; save_now()
-        embed = discord.Embed(title="—— 2000km，终点", description="千户：...上面什么都没有啊\n尤莉：嗯\n千户：我们走了2000km，就为了看这个？\n尤莉：千户，你看，星星好漂亮\n千户：...嗯\n\n我们现在是世界上最幸福的人。", color=0x000000)
+        embed = discord.Embed(title="—— 3000km，终点", description="我们现在是世界上最幸福的人。", color=0x000000)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967131077152878/IMG-20261028-WA8675.jpg?ex=6ae3d977&is=6ae287f7&hm=8e9c12b7b26a37f13e7088978dd3bdb0fb06612a955033c5a9f72a70e3972de6&")
-        await interaction.response.send_message(embed=embed, view=RestartView(interaction.user.id)); return
+        await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id)); return
 
     if is_endless:
         last_150 = (prev_km // 150) * 150
         curr_150 = (data["km"] // 150) * 150
         if curr_150 > last_150 and curr_150 > 0:
-            save_now()
-            await interaction.response.send_message(embed=discord.Embed(title=f"♾️ 无尽 {curr_150}km", description=f"已经走了 {curr_150}km\nKettenkrad还在跑，旅途没有终点。\n食物{data['food']} 燃料{data['fuel']} | 本次+{move}km", color=0x00ffaa)); return
+            save_now(); await interaction.followup.send(embed=discord.Embed(title=f"♾️ 无尽 {curr_150}km", description=f"饥饿{data['hunger']}% 燃料{data['fuel']} +{move}km", color=0x00ffaa), view=WalkView(interaction.user.id)); return
 
     if not is_endless:
         force_met = []
         for name, nd in ALL_NPCS.items():
             if name in ["上层的幽灵","千户","尤莉"]: continue
             if name not in data["met_npcs"] and name not in data.get("ever_met", set()) and data["km"] >= nd["km_need"]:
-                data["met_npcs"].add(name)
-                data["ever_met"].add(name)
-                data["npc_met_km"][name]=data["km"]
-                force_met.append(name)
+                data["met_npcs"].add(name); data["ever_met"].add(name); data["npc_met_km"][name]=data["km"]; force_met.append(name)
         if force_met:
-            name = force_met[0]
-            save_now()
-            embed = discord.Embed(title=f"📍 遇到了 {name} - {data['km']}km", description=NPC_DIALOGUE.get(name, f"遇到了 {name}") + f"\n\n只能在15km内 /交易 {name}", color=ALL_NPCS[name]["color"])
-            await interaction.response.send_message(embed=embed); return
+            name = force_met[0]; save_now()
+            await interaction.followup.send(embed=discord.Embed(title=f"📍 遇到了 {name} - {data['km']}km", description=NPC_DIALOGUE.get(name,"") + f"\n15km内可 /交易 {name}", color=ALL_NPCS[name]["color"]), view=WalkView(interaction.user.id)); return
 
-        if random.random() < 0.12:
-            if random.random() < 0.5:
-                embed = discord.Embed(title=f"{data['km']}km - 尤莉", description=random.choice(["尤莉：千户，好饿啊~\n千户：再忍忍...","尤莉：我想吃鱼！\n千户：哪里有鱼啊","尤莉：呐，千户，你说上层有什么？\n千户：...不知道"]), color=0xf2c17c)
-            else:
-                embed = discord.Embed(title=f"{data['km']}km - 千户", description=random.choice(["千户：尤莉，别乱开枪，子弹只有一发了\n尤莉：知道啦","千户：这本书上说...","千户：Kettenkrad还能跑..."]), color=0x8b9a7d)
-            embed.set_author(name=f"{data['km']}km | 食物{data['food']} 燃料{data['fuel']} | +{move}km")
-            save_now()
-            await interaction.response.send_message(embed=embed); return
-
-    if data["km"] < 1100:
+    if data["km"] < 1650:
         roll_type = random.choices(["空空", "食物", "杂物"], weights=[30, 45, 25])[0]
     else:
         roll_type = random.choices(["空空", "食物", "杂物"], weights=[45, 35, 20])[0]
 
     if roll_type == "空空":
         save_now()
-        embed = discord.Embed(title="空空" if not is_endless else f"♾️ 无尽荒野 {data['km']}km", description=random.choice(["什么都没有...","风声...","只有履带的回响","尤莉：千户，这里好无聊啊","千户：..."]), color=0x555555)
-        embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 食物{data['food']} 燃料{data['fuel']} | +{move}km")
-        await interaction.response.send_message(embed=embed); return
+        embed = discord.Embed(title="空空", description=random.choice(["什么都没有...","风声..."]), color=0x555555)
+        embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 饥饿{data['hunger']}% 燃料{data['fuel']} +{move}km")
+        await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id)); return
 
     if roll_type == "食物":
-        if data["km"] >= 1500 and not is_dev_now and not is_endless:
-            save_now()
-            await interaction.response.send_message(embed=discord.Embed(title="空空", description="真正的上层，什么都没有...")); return
-        if random.random() < 0.55:
-            food_item = random.choice(["压缩口粮 x1", "土豆干 x2", "压缩口粮 x10", "军用口粮 x10"])
-            desc = "🍙 找到食物！"
-        else:
-            food_item = random.choice(["燃料桶(半满)", "燃料桶 x20"])
-            desc = "⛽ 找到燃料！"
+        if data["km"] >= 2250 and not is_dev_now and not is_endless:
+            save_now(); await interaction.followup.send(embed=discord.Embed(title="空空", description="上层什么都没有..."), view=WalkView(interaction.user.id)); return
+        food_item = random.choice(["压缩口粮 x1", "土豆干 x2", "压缩口粮 x10", "军用口粮 x10", "鱼", "面包"]) if random.random() < 0.6 else random.choice(["燃料桶(半满)", "燃料桶 x20"])
         data["inventory"].append(food_item)
-        if "口粮" in food_item or "土豆" in food_item:
-            data["food"] += 10 if "x10" in food_item else (2 if "x2" in food_item else 1)
-        if "燃料" in food_item: data["fuel"] += 20 if "x20" in food_item else 5
+        if get_fuel_value(food_item): data["fuel"] += get_fuel_value(food_item)
         save_now()
-        embed = discord.Embed(title=desc, description=f"获得 {food_item}\n尤莉：哇！\n千户：...省着点吃", color=0x8b9a7d)
-        embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 食物{data['food']} 燃料{data['fuel']} | +{move}km")
-        await interaction.response.send_message(embed=embed); return
+        embed = discord.Embed(title="🍙 找到食物！" if get_food_value(food_item) else "⛽ 找到燃料！", description=f"获得 {food_item}\n饥饿{data['hunger']}% 燃料{data['fuel']}", color=0x8b9a7d)
+        embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 饥饿{data['hunger']}% 燃料{data['fuel']} +{move}km")
+        await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id)); return
 
     if roll_type == "杂物":
         item, weight, dialogue = random.choice(RANDOM_LOOT)
         data["inventory"].append(item); save_now()
         embed = discord.Embed(title="🔧 找到杂物", description=f"获得 {item}\n\n{dialogue}", color=0x666666)
-        embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 食物{data['food']} 燃料{data['fuel']} | +{move}km")
-        await interaction.response.send_message(embed=embed); return
+        embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | 饥饿{data['hunger']}% 燃料{data['fuel']} +{move}km")
+        await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id)); return
+
+@bot.tree.command(name="步行", description="步行3000km到上层")
+async def 步行(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=False)
+    await do_walk_logic(interaction)
 
 @bot.tree.command(name="背包", description="查看背包")
 async def 背包(interaction: discord.Interaction):
     d=get_player(interaction.user.id)
     lines, _ = format_backpack(d["inventory"])
     text = "\n".join(lines) if lines else "空空如也"
-    embed = discord.Embed(title=f"{'♾️ 无尽 ' if d.get('endless') else ''}{d['km']}km 背包 - {d['food']}食物 {d['fuel']}燃料", description=text, color=0x00ffaa if d.get('endless') else 0x8b9a7d)
-    await interaction.response.send_message(embed=embed)
+    embed = discord.Embed(title=f"{'♾️ 无尽 ' if d.get('endless') else ''}{d['km']}km 背包 - {d['hunger']}%饥饿 {d['fuel']}燃料", description=text, color=0x00ffaa if d.get('endless') else 0x8b9a7d)
+    await interaction.response.send_message(embed=embed, view=WalkView(interaction.user.id))
 
 @bot.tree.command(name="交易", description="与NPC或玩家交易")
 @discord.app_commands.choices(npc=[discord.app_commands.Choice(name=k, value=k) for k in ALL_NPCS.keys()])
 async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, npc: str=None):
     await interaction.response.defer(ephemeral=True)
     d=get_player(interaction.user.id)
-    is_dev_now = interaction.user.id in dev_mode_users
     if npc:
-        if not is_dev_now:
-            if npc not in d["met_npcs"]:
-                await interaction.followup.send(f"❌ 还没遇到 {npc}，或者他已经离开了(15km限制)", ephemeral=True); return
+        if interaction.user.id not in dev_mode_users and npc not in d["met_npcs"]:
+            await interaction.followup.send(f"❌ 还没遇到 {npc}", ephemeral=True); return
         view = TradeView(interaction.user.id, npc_name=npc, inventory=d["inventory"])
-        await interaction.followup.send(embed=discord.Embed(title=f"与 {npc} 交易 - 选择一件物品送出", description=NPC_DIALOGUE.get(npc,"")[:200]), view=view, ephemeral=True)
+        await interaction.followup.send(embed=discord.Embed(title=f"与 {npc} 交易"), view=view, ephemeral=True)
     else:
-        if not 用户:
-            await interaction.followup.send("❌ 请@一个玩家或选一个NPC", ephemeral=True); return
+        if not 用户: await interaction.followup.send("❌ 请@玩家或选NPC", ephemeral=True); return
         view = TradeView(interaction.user.id, to_id=用户.id, inventory=d["inventory"])
         await interaction.followup.send(embed=discord.Embed(title=f"与 {用户.display_name} 交易"), view=view, ephemeral=True)
 
