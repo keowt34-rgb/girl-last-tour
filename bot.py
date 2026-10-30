@@ -145,6 +145,57 @@ RANDOM_LOOT = [
 ALL_ITEMS_POOL = list(set(list(FOOD_HUNGER.keys()) + ["燃料桶 x20","燃料桶(半满)","生锈的螺栓","空罐头","旧报纸","破布","发光的石头","38式步枪子弹 x5","空弹壳","手绘地图碎片","世界地图(残缺)","金泽的眼镜","小地藏雕像","石像 x10","石像爷爷的刻刀","飞机设计图","螺旋桨碎片","管制官的密钥","日记(千户写的)","修理工具","旧式相机胶卷","尤莉的笑脸","尤莉的歌声","尤莉的拥抱","发光的努可","电能 x100","星空的照片","END标记"]))
 
 FIXED_STORIES = {
+    fish": {
+        "type": "km",
+        "at": 85,
+        "title": "📍 大型水坝",
+        "pages": [
+            "他们从寒冷的仓库出来后遇到了巨型水坝\n\n"
+            "尤莉：是水坝耶！\n"
+            "千户：我知道啦，那些水是融化掉了的雪水....我们下去看看，尤莉。\n"
+            "尤莉：好！",
+            
+            "于是他们从旁边的楼梯走了下去\n\n"
+            "尤莉：千户，我们下去是干嘛的。\n"
+            "千户：看水坝啊。\n"
+            "尤莉：就单单看水坝吗？\n"
+            "千户：不可能只是单单看水坝啦...",
+            
+            "他们走到了楼梯口后，脱掉了鞋子前往水域"
+            "千户：好冷...\n"
+            "尤莉：我也是...啊秋!",
+            
+            "尤莉：千户你看！天空好蔚蓝耶！\n"
+            "千户：嗯？\n"
+            "千户：确实很蓝...这天气我们要不洗衣服吧。\n"
+            "尤莉：诶？要洗衣服吗？",
+            
+            "他们换上了另一套服并绑绳子在各自的腰上防止被水冲走\n\n"
+            "尤莉：千户干嘛要绑绳子啦。\n"
+            "千户：防止被水冲走啊。\n"
+            "尤莉：好吧...",
+            
+            "过了20分钟后尤莉看到了一条鱼，于是不顾千户的警告去抓了那条鱼\n\n"
+            "尤莉：千户你看！是鱼耶！\n"
+            "千户：干嘛去抓鱼啦...这很危险啦。不过在这个末日环境下竟然还有生物，真是奇迹。\n"
+            "尤莉：千户要不我们把它烤来吃吧。\n"
+            "千户：好主意！"
+            
+            "于是他们烤了鱼后并吃了下去\n\n"
+            "尤莉：千户，你尝尝。很好吃！\n"
+            "千户：给我我试看。\n"
+            "千户：嗯~ 味道确实不错但有点怪\n"
+            "—— 饥饿度+65%"
+            
+            ""
+            ""
+            ""
+            ""
+            ""
+            ""
+            ""
+            ""
+            ""
     "soup": {
         "type": "step",  # 这个是按步数触发
         "at": 6,         # 25步触发
@@ -166,7 +217,7 @@ FIXED_STORIES = {
             "尤莉：啊，好好喝！\n"
             "千户：嗯~\n"
             "过后他们简单收拾了后就继续上路了\n\n"
-            "—— 舒适度+50%"
+            "—— 饥饿度+40%"
         ],
         "images": {
             2: "https://cdn.discordapp.com/attachments/1519326691095478272/1565373186307260446/Screenshot_20261029_215528_com.android.chrome_edit_193623155043371.jpg?ex=6ae4aae2&is=6ae35962&hm=0024f83146d81b015d7dcaa9759ba93234d4fc565d239e1204641de0c8109436&"
@@ -174,7 +225,7 @@ FIXED_STORIES = {
     },
     "hotspring": {
         "type": "km",  # 这个是按公里触发
-        "at": 75,      # 100km触发
+        "at": 70,      # 100km触发
         "title": "📍 75km - 暴风雪中的温泉",
         "pages": [
             "雪越来越大了，什么都看不见。\n\n"
@@ -194,8 +245,7 @@ FIXED_STORIES = {
             "千户：呜啊~ 活过来了~\n"
             "尤莉：千户你脸好红~\n"
             "千户：是...是被热气熏的啦！\n"
-            "雪还在外面下，这里却暖和得像梦一样。\n"
-            "—— 饥饿+60%"
+            "雪还在外面下，这里却暖和得像梦一样。"
         ],
         "images": {
             0: "https://cdn.discordapp.com/attachments/1519326691095478272/1565427726142152754/Screenshot_20261029_232929_com.android.chrome_edit_206629181038261.jpg?ex=6ae4ddae&is=6ae38c2e&hm=2e9a8484279f566021591c4ad556f606a7c9d3b2f4732cf493b7834bca0901cf&",
@@ -291,8 +341,12 @@ class FixedStoryView(discord.ui.View):
         self.page += 1
         if self.page >= len(story["pages"]):
             if self.story_id not in p["fixed_done"]:
-                p["fixed_done"].append(self.story_id)
-                p["hunger"] = min(100, p["hunger"] + 60)
+    p["fixed_done"].append(self.story_id)
+    if self.story_id == "fish":
+        p["inventory"].append("鱼")
+        p["hunger"] = min(100, p["hunger"] + 65)
+    elif self.story_id == "soup":
+        p["hunger"] = min(100, p["hunger"] + 40)
             save_now()
             await interaction.response.edit_message(embed=discord.Embed(title=f"{story['title']} - End", description="Continue.", color=0x8b9a7d), view=WalkView(self.user_id))
             return
