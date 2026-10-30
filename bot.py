@@ -348,12 +348,12 @@ class FixedStoryView(discord.ui.View):
         self.page += 1
         if self.page >= len(story["pages"]):
             if self.story_id not in p["fixed_done"]:
-    p["fixed_done"].append(self.story_id)
-    if self.story_id == "fish":
-        p["inventory"].append("鱼")
-        p["hunger"] = min(100, p["hunger"] + 65)
-    elif self.story_id == "soup":
-        p["hunger"] = min(100, p["hunger"] + 40)
+                p["fixed_done"].append(self.story_id)
+                if self.story_id == "fish":
+                    p["inventory"].append("鱼")
+                    p["hunger"] = min(100, p["hunger"] + 65)
+                elif self.story_id == "soup":
+                    p["hunger"] = min(100, p["hunger"] + 40)
             save_now()
             await interaction.response.edit_message(embed=discord.Embed(title=f"{story['title']} - End", description="Continue.", color=0x8b9a7d), view=WalkView(self.user_id))
             return
