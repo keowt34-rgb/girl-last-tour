@@ -289,9 +289,9 @@ FIXED_STORIES = {
         "images": {
             0: "https://cdn.discordapp.com/attachments/1519326691095478272/1565427726142152754/Screenshot_20261029_232929_com.android.chrome_edit_206629181038261.jpg?ex=6ae4ddae&is=6ae38c2e&hm=2e9a8484279f566021591c4ad556f606a7c9d3b2f4732cf493b7834bca0901cf&",
             2: "https://cdn.discordapp.com/attachments/1519326691095478272/1565427726607847548/Screenshot_20261029_233229_com.android.chrome_edit_206635598435656.jpg?ex=6ae4ddae&is=6ae38c2e&hm=115de438991d62a767b1c40e219e07f92aa3316e14eed2754fcf735dd9fcf9a1&",
-            3: "",
+            3: "https://cdn.discordapp.com/attachments/1519326691095478272/1565630542106333215/Screenshot_20261030_153628_com.android.chrome_edit_23597795957856.jpg?ex=6ae59a91&is=6ae44911&hm=6f885186dc803e134c3b4b2ced02c26136b64e22ffd5ce59f8cedacfda0296ff&",
             6: "https://cdn.discordapp.com/attachments/1519326691095478272/1565630038219559033/Screenshot_20261030_152903_com.zhiliaoapp.musically_edit_23152539238653.jpg?ex=6ae59a19&is=6ae44899&hm=edd535e68eee9f8ec5a86dd8cb3ff4d2bae50c8d4c580fa75b05f185293449cc&",
-            7: ""
+            7: "https://cdn.discordapp.com/attachments/1519326691095478272/1565625168645332992/Screenshot_20261030_140159_com.android.chrome_edit_18549156629460.jpg?ex=6ae59590&is=6ae44410&hm=c73327cfcb54e2ad48c0485bb210f081d6b8c59674f4586b7e4210f0a9f3832b&"
         }
     }
 }
