@@ -801,19 +801,20 @@ async def do_walk_logic(interaction: discord.Interaction):
             ),
             color=0xFFD700
         )
-        embed.set_image(url="")
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565646683109335071/images_30.jpg?ex=6ae5a999&is=6ae45819&hm=2751c65f8eecbfe714cb58b255d78bcd8d8be76d0eb15dde0a9e3bf16beb62f4&")
         await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
         return
 
     # 原本的普通结局
     data["km"] = 3000
-    data["ended"] = True; save_now()
+    data["ended"] = True
+    save_now()
     embed = discord.Embed(
         title="—— 3000km，虚无的上层",
         description="......嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完",
         color=0x000000
     )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae48234&is=6ae330b4&hm=17b4fac59ef27fc216466ce7ee65840a018a7683934c58abbfd69aad81f54753&")
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae52af4&is=6ae3d974&hm=56d64ddcd4c31ce90adc48d6e4e6262e7f3d260c3c3de1902bab22fc6df15dc5&")
     await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
     return
 
