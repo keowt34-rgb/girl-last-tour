@@ -782,7 +782,7 @@ async def do_walk_logic(interaction: discord.Interaction):
 
     if not is_endless and data["km"] >= 3000 and not data["ended"]:
         # 1% 隐藏结局
-        if random.random() < 1.00:
+        if random.random() < 0.01:
             data["km"] = 3000
             data["ended"] = True
             save_now()
@@ -801,7 +801,7 @@ async def do_walk_logic(interaction: discord.Interaction):
                 ),
                 color=0xFFD700
             )
-            embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565646683109335071/images_30.jpg?ex=6ae5a999&is=6ae45819&hm=2751c65f8eecbfe714cb58b255d78bcd8d8be76d0eb15dde0a9e3bf16beb62f4&")
+            embed.set_image(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565650419374358558/images_30.jpg?ex=6ae5ad14&is=6ae45b94&hm=68483345fb91a55aa7877d2bbef814a2145e9e12f7d6837a9cac603f50782881&")
             await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
             return
 
