@@ -781,42 +781,42 @@ async def do_walk_logic(interaction: discord.Interaction):
         return
 
     if not is_endless and data["km"] >= 3000 and not data["ended"]:
-    # 1% 隐藏结局
-    if random.random() < 1.00:
+        # 1% 隐藏结局
+        if random.random() < 1.00:
+            data["km"] = 3000
+            data["ended"] = True
+            save_now()
+            embed = discord.Embed(
+                title="—— 3000km，隐藏结局 - 稻田 ",
+                description=(
+                    "尤莉：千户！这里是......?\n"
+                    "千户：诶？稻田？\n\n"
+                    "在望不到头的稻田上，还有一个正方形的石头\n"
+                    "不是无尽的虚无，也没有寒冷的雪，取而代替的是一个由大量稻米组成的稻田\n\n"
+                    "千户：竟然是...稻米！太好了！\n"
+                    "尤莉：千户，我们是不是有吃不完的食物了\n"
+                    "千户：嗯，是的....\n\n"
+                    "—— 1% 隐藏结局触发\n\n"
+                    "(注意：这个隐藏结局是游戏作者自己加入的，跟原作毫无相关。)"
+                ),
+                color=0xFFD700
+            )
+            embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565646683109335071/images_30.jpg?ex=6ae5a999&is=6ae45819&hm=2751c65f8eecbfe714cb58b255d78bcd8d8be76d0eb15dde0a9e3bf16beb62f4&")
+            await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
+            return
+
+    # 原本的普通结局
         data["km"] = 3000
         data["ended"] = True
         save_now()
         embed = discord.Embed(
-            title="—— 3000km，隐藏结局 - 稻田 ",
-            description=(
-                "尤莉：千户！这里是......?\n"
-                "千户：诶？稻田？\n\n"
-                "在望不到头的稻田上，还有一个正方形的石头\n"
-                "不是无尽的虚无，也没有寒冷的雪，取而代替的是一个由大量稻米组成的稻田\n\n"
-                "千户：竟然是...稻米！太好了！\n"
-                "尤莉：千户，我们是不是有吃不完的食物了\n"
-                "千户：嗯，是的....\n\n"
-                "—— 1% 隐藏结局触发\n\n"
-                "(注意：这个隐藏结局是游戏作者自己加入的，跟原作毫无相关。)"
-            ),
-            color=0xFFD700
+            title="—— 3000km，虚无的上层",
+            description="......嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完",
+            color=0x000000
         )
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565646683109335071/images_30.jpg?ex=6ae5a999&is=6ae45819&hm=2751c65f8eecbfe714cb58b255d78bcd8d8be76d0eb15dde0a9e3bf16beb62f4&")
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae52af4&is=6ae3d974&hm=56d64ddcd4c31ce90adc48d6e4e6262e7f3d260c3c3de1902bab22fc6df15dc5&")
         await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
         return
-
-    # 原本的普通结局
-    data["km"] = 3000
-    data["ended"] = True
-    save_now()
-    embed = discord.Embed(
-        title="—— 3000km，虚无的上层",
-        description="......嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完",
-        color=0x000000
-    )
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae52af4&is=6ae3d974&hm=56d64ddcd4c31ce90adc48d6e4e6262e7f3d260c3c3de1902bab22fc6df15dc5&")
-    await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
-    return
 
     if is_endless:
         last_150 = (prev_km // 150) * 150
