@@ -194,13 +194,13 @@ FIXED_STORIES = {
             "简单收拾了后他们就继续上路了"
         ],
         "images": {
-            0: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621088938106960/Screenshot_20261030_140306_com.android.chrome_edit_18555639303938.jpg?ex=6ae591c3&is=6ae44043&hm=f88d096397fcdeb6fb9a0dbc65aab17c732992bc5bcaceeea010492bc3267e8f&"
-            1: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621089609187358/Screenshot_20261030_140419_com.android.chrome_edit_18570951399769.jpg?ex=6ae591c3&is=6ae44043&hm=ef82b943fa1558a77831bd3d947ecd58666cf2dcdc78949cdc15b1e86bd6e83e&"
-            3: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621089936089158/Screenshot_20261030_140535_com.android.chrome_edit_18577987304976.jpg?ex=6ae591c3&is=6ae44043&hm=1a5398a86a42f2eda6b9ae966f759ec86b27c51dff0f45d780afea767ccdfce3&"
-            4: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621090687000586/Screenshot_20261030_140714_com.android.chrome_edit_18588518867995.jpg?ex=6ae591c3&is=6ae44043&hm=2991e56efa14090bca15194dda1901e63f832f38f69a263168f981dfabcd6dfe&"
-            5: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621091416936488/Screenshot_20261030_140911_com.android.chrome_edit_18599762266431.jpg?ex=6ae591c4&is=6ae44044&hm=986bc8fb2b75179b986ff30b23e13c6084f3e7ff37d8fef12056d62c48bf4592&"
-            6: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621092112924682/Screenshot_20261030_145850_com.android.chrome_edit_21335574459764.jpg?ex=6ae591c4&is=6ae44044&hm=febf4682e117d3a272e81e6f69d3d67e62a3e7463bfcf89f5da1f6c1334035c1&"
-            7: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621091794292897/Screenshot_20261030_141147_com.android.chrome_edit_18608049239867.jpg?ex=6ae591c4&is=6ae44044&hm=ed4e4c715810660b8ee0b87030840d141d6592cc5311e95e13e5c335b08814b1&"
+            0: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621088938106960/Screenshot_20261030_140306_com.android.chrome_edit_18555639303938.jpg?ex=6ae591c3&is=6ae44043&hm=f88d096397fcdeb6fb9a0dbc65aab17c732992bc5bcaceeea010492bc3267e8f&",
+            1: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621089609187358/Screenshot_20261030_140419_com.android.chrome_edit_18570951399769.jpg?ex=6ae591c3&is=6ae44043&hm=ef82b943fa1558a77831bd3d947ecd58666cf2dcdc78949cdc15b1e86bd6e83e&",
+            3: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621089936089158/Screenshot_20261030_140535_com.android.chrome_edit_18577987304976.jpg?ex=6ae591c3&is=6ae44043&hm=1a5398a86a42f2eda6b9ae966f759ec86b27c51dff0f45d780afea767ccdfce3&",
+            4: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621090687000586/Screenshot_20261030_140714_com.android.chrome_edit_18588518867995.jpg?ex=6ae591c3&is=6ae44043&hm=2991e56efa14090bca15194dda1901e63f832f38f69a263168f981dfabcd6dfe&",
+            5: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621091416936488/Screenshot_20261030_140911_com.android.chrome_edit_18599762266431.jpg?ex=6ae591c4&is=6ae44044&hm=986bc8fb2b75179b986ff30b23e13c6084f3e7ff37d8fef12056d62c48bf4592&",
+            6: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621092112924682/Screenshot_20261030_145850_com.android.chrome_edit_21335574459764.jpg?ex=6ae591c4&is=6ae44044&hm=febf4682e117d3a272e81e6f69d3d67e62a3e7463bfcf89f5da1f6c1334035c1&",
+            7: "https://cdn.discordapp.com/attachments/1519326691095478272/1565621091794292897/Screenshot_20261030_141147_com.android.chrome_edit_18608049239867.jpg?ex=6ae591c4&is=6ae44044&hm=ed4e4c715810660b8ee0b87030840d141d6592cc5311e95e13e5c335b08814b1&",
         }
     },
     "soup": {
