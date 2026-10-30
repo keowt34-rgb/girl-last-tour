@@ -554,7 +554,7 @@ async def do_walk_logic(interaction: discord.Interaction):
             return
 
     data["step"] += 1
-    has_bike = any("Kettenkrad" in i or "履带摩托" in i for i in data["inventory"])
+    has_bike = any(("Kettenkrad" in i or "履带摩托" in i) and "浴缸" not in i for i in data["inventory"])
 
     if data["step"] == 5 and not is_endless:
         save_now()
@@ -591,7 +591,7 @@ async def do_walk_logic(interaction: discord.Interaction):
         data["km"] += move
 
     # 检查有没有到固定关卡
-        prev_step = data["step"] - 1
+    prev_step = data["step"] - 1
     for story_id, story in FIXED_STORIES.items():
         if story_id in data.get("fixed_done", []):
             continue
@@ -617,7 +617,17 @@ async def do_walk_logic(interaction: discord.Interaction):
             save_now()
             return
 
-    if data["step"] == 12 and not data["visited_airplane"] and not is_endless:
+    if data["step"] <= 4:
+        embed = discord.Embed(
+            title="🚶‍♀️ 继续前进...",
+            description=f"目前走了 {data['step']} 步 / {data['km']}km\n四周很安静，还没有遇到什么事。",
+            color=0x8b9a7d
+        )
+        await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id))
+        save_now()
+        return
+    
+    if data["step"] == 11 and not data["visited_airplane"] and not is_endless:
         data["visited_airplane"] = True
         data["inventory"].extend(["压缩口粮 x10", "生锈的仪表盘"]); save_now()
         embed = discord.Embed(title="📍 发现报废战斗机", description="尤莉：是飞机耶！\n千户：那是战斗机\n尤莉：诶...他还能飞吗\n千户：已经不能了....走，我们进去看有没有粮食\n获得：压缩口粮 x10 (+100%)", color=0x8b9a7d)
@@ -643,7 +653,7 @@ async def do_walk_logic(interaction: discord.Interaction):
     if not is_endless and not data.get("bike_scrapped", False) and prev_km < 2550 <= data["km"]:
         data["bike_scrapped"] = True; data["bath_to_delete"] = True
         for i in range(len(data["inventory"])-1, -1, -1):
-            if "Kettenkrad" in data["inventory"][i] or "履带摩托" in data["inventory"][i]:
+            if ("Kettenkrad" in data["inventory"][i] or "履带摩托" in data["inventory"][i]) and "浴缸" not in data["inventory"][i]:
                 del data["inventory"][i]; break
         data["inventory"].append("Kettenkrad浴缸"); save_now()
         embed = discord.Embed(
@@ -721,7 +731,7 @@ async def do_walk_logic(interaction: discord.Interaction):
     if roll_type == "食物":
         if data["km"] >= 2250 and not is_dev_now and not is_endless:
             save_now(); await interaction.followup.send(embed=discord.Embed(title="空空", description="上层什么都没有...", color=0x555555), view=WalkView(interaction.user.id)); return
-        food_item = random.choice(["压缩口粮 x1", "土豆干 x2", "压缩口粮 x10", "军用口粮 x10", "鱼", "面包"]) if random.random() < 0.6 else random.choice(["燃料桶(半满)", "燃料桶 x20"])
+        food_item = random.choice(["压缩口粮 x1", "土豆干 x2", "压缩口粮 x10", "军用口粮 x10"]) if random.random() < 0.6 else random.choice(["燃料桶(半满)", "燃料桶 x20"])
         data["inventory"].append(food_item)
         if get_fuel_value(food_item): data["fuel"] += get_fuel_value(food_item)
         save_now()
