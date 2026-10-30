@@ -25,6 +25,9 @@ def load_save():
                     pdata["met_npcs"] = set(pdata.get("met_npcs", ["千户","尤莉"]))
                     pdata["ever_met"] = set(pdata.get("ever_met", list(pdata["met_npcs"])))
                     pdata["npc_met_km"] = pdata.get("npc_met_km", {"千户":0,"尤莉":0})
+                    pdata["fixed_done"] = pdata.get("fixed_done", [])
+                    pdata["in_fixed_story"] = pdata.get("in_fixed_story", None)
+                    pdata["rice_pity"] = pdata.get("rice_pity", 0)
                     players[int(uid)] = pdata
                 dev_mode_users = set(data.get("dev_mode_users", []))
         except Exception as e:
@@ -161,7 +164,7 @@ FIXED_STORIES = {
             "尤莉：就单单看水坝吗？\n"
             "千户：不可能只是单单看水坝啦...",
             
-            "他们走到了楼梯口后，脱掉了鞋子前往水域"
+            "他们走到了楼梯口后，脱掉了鞋子前往水域\n\n"
             "千户：好冷...\n"
             "尤莉：我也是...啊秋!",
             
@@ -312,7 +315,9 @@ def get_player(uid):
             "ever_met":set(["千户","尤莉"]),
             "npc_met_km":{"千户":0,"尤莉":0},
             "inventory":["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"],
-            "fixed_done": []
+            "fixed_done": [],
+            "in_fixed_story": None,
+            "rice_pity": 0
         }
         save_now()
     p = players[uid]
@@ -325,6 +330,8 @@ def get_player(uid):
     if "ever_met" not in p: p["ever_met"]=set(p["met_npcs"])
     if "npc_met_km" not in p: p["npc_met_km"]={}
     if "fixed_done" not in p: p["fixed_done"]=[]
+    if "in_fixed_story" not in p: p["in_fixed_story"]=None
+    if "rice_pity" not in p: p["rice_pity"]=0
     return p
 
 def is_paused(p):
@@ -389,6 +396,7 @@ class FixedStoryView(discord.ui.View):
                     p["hunger"] = min(100, p["hunger"] + 65)
                 elif self.story_id == "soup":
                     p["hunger"] = min(100, p["hunger"] + 40)
+            p["in_fixed_story"] = None  # 解锁
             save_now()
             await interaction.response.edit_message(embed=discord.Embed(title=f"{story['title']} - End", description="Continue.", color=0x8b9a7d), view=WalkView(self.user_id))
             return
@@ -447,10 +455,11 @@ class EndlessConfirmView(discord.ui.View):
     @discord.ui.button(label="确定", style=discord.ButtonStyle.danger, emoji="⚠️")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
+        old_pity = get_player(interaction.user.id).get("rice_pity", 0)
         if self.to_endless:
-            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": True, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"], "fixed_done": []}
+            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": True, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
         else:
-            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": []}
+            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
         save_now()
         await interaction.response.edit_message(embed=discord.Embed(title="已切换", color=0x00ffaa), view=None)
 
@@ -460,7 +469,8 @@ class RestartView(discord.ui.View):
     @discord.ui.button(label="重新开始", style=discord.ButtonStyle.primary, emoji="🔄")
     async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
-        players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False,"bath_to_delete": False,"endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": []}
+        old_pity = get_player(interaction.user.id).get("rice_pity", 0)
+        players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False,"bath_to_delete": False,"endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
         save_now()
         await interaction.response.edit_message(embed=discord.Embed(title="🔄 重新开始 0km 饥饿100%", color=0x8b9a7d), view=None)
 
@@ -476,17 +486,23 @@ class TradeView(discord.ui.View):
         self.select_give = discord.ui.Select(placeholder=f"选择物品 共{len(inv)}件", min_values=1, max_values=1, options=opts)
         self.select_give.callback = self.select_callback
         self.add_item(self.select_give)
+
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.from_id: return
         _, item_name = self.select_give.values[0].split("|", 1)
         self.offer = item_name
         await interaction.response.send_message(f"已选择：**{self.offer}**", ephemeral=True)
+
     @discord.ui.button(label="确认交易", style=discord.ButtonStyle.success, emoji="🤝")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.from_id: return
-        if not self.offer: return
+        if not self.offer: 
+            await interaction.response.send_message("❌ 请先选物品", ephemeral=True)
+            return
         p = get_player(self.from_id)
-        if self.offer not in p["inventory"]: return
+        if self.offer not in p["inventory"]: 
+            await interaction.response.send_message("❌ 物品不在了", ephemeral=True)
+            return
         sync_item(p, self.offer, add=False)
         if self.npc_name:
             reward = roll(self.npc_name)
@@ -498,11 +514,18 @@ class TradeView(discord.ui.View):
                 if sp["effect"]=="END": p["ended"]=True
             emb=discord.Embed(title=f"✨ {reward}", description=f"{SPECIAL_REWARDS[reward]['text']}\n\n{self.offer} -> {reward}\n现在 饥饿{p['hunger']}% 燃料{p['fuel']}", color=SPECIAL_REWARDS[reward]["color"] if reward in SPECIAL_REWARDS else ALL_NPCS[self.npc_name]["color"])
             if reward in SPECIAL_REWARDS and SPECIAL_REWARDS[reward].get("image"): emb.set_image(url=SPECIAL_REWARDS[reward]["image"])
-            await interaction.response.edit_message(embed=emb, view=None)
+            save_now()
+            await interaction.response.edit_message(embed=emb, view=TradeView(self.from_id, to_id=self.to_id, npc_name=self.npc_name, inventory=p["inventory"]))
         else:
             target = get_player(self.to_id); target["inventory"].append(self.offer); sync_item(target, self.offer, add=True); p["inventory"].remove(self.offer)
-            await interaction.response.edit_message(embed=discord.Embed(title="交易完成"), view=None)
-        save_now()
+            save_now()
+            await interaction.response.edit_message(embed=discord.Embed(title="交易完成", description=f"{self.offer} 已给 {self.to_id}"), view=TradeView(self.from_id, to_id=self.to_id, npc_name=self.npc_name, inventory=p["inventory"]))
+
+    @discord.ui.button(label="重新交易", style=discord.ButtonStyle.secondary, emoji="🔄")
+    async def retrade(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.from_id: return
+        p = get_player(self.from_id)
+        await interaction.response.edit_message(embed=discord.Embed(title=f"与 {self.npc_name or '玩家'} 交易", description=f"背包 {len(p['inventory'])}件"), view=TradeView(self.from_id, to_id=self.to_id, npc_name=self.npc_name, inventory=p["inventory"]))
 
 class GiveView(discord.ui.View):
     def __init__(self, user_id, inventory):
@@ -632,6 +655,23 @@ async def do_walk_logic(interaction: discord.Interaction):
     is_endless = data.get("endless", False)
     prev_km = data["km"]
 
+    # --- 新增：强制剧情锁，剧情没看完不能用 /步行 ---
+    if data.get("in_fixed_story"):
+        story_id = data["in_fixed_story"]
+        story = FIXED_STORIES.get(story_id)
+        if story:
+            embed = discord.Embed(
+                title=f"{story['title']} - 剧情进行中",
+                description="⚠️ 剧情还没看完，不能继续步行！\n请先把当前剧情看完。",
+                color=0xff4444
+            )
+            # 把他弹回剧情第一页
+            await interaction.followup.send(embed=embed, view=FixedStoryView(interaction.user.id, story_id, 0))
+            return
+        else:
+            # 防止数据坏掉
+            data["in_fixed_story"] = None
+
     if data.get("ended") and not is_endless:
         embed = discord.Embed(title="—— 3000km，终点", description="......嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完", color=0x000000)
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae48234&is=6ae330b4&hm=17b4fac59ef27fc216466ce7ee65840a018a7683934c58abbfd69aad81f54753&")
@@ -701,6 +741,7 @@ async def do_walk_logic(interaction: discord.Interaction):
                 triggered = True
         
         if triggered:
+            data["in_fixed_story"] = story_id  # 锁住
             embed = discord.Embed(
                 title=f"{story['title']} [1/{len(story['pages'])}]",
                 description=story["pages"][0],
@@ -708,7 +749,6 @@ async def do_walk_logic(interaction: discord.Interaction):
             )
             if "images" in story and 0 in story["images"]:
                 embed.set_image(url=story["images"][0])
-            # 注意这里传 story_id，不是数字了
             await interaction.followup.send(embed=embed, view=FixedStoryView(interaction.user.id, story_id, 0))
             save_now()
             return
@@ -736,10 +776,11 @@ async def do_walk_logic(interaction: discord.Interaction):
         if data["fuel"] > 0:
             data["fuel"] = max(0, data["fuel"] - 1)
         if data["hunger"] <= 0:
-            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38 if is_endless else 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": is_endless, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"] if is_endless else ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": []}
+            old_pity = data.get("rice_pity", 0)
+            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38 if is_endless else 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": is_endless, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"] if is_endless else ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
             save_now()
             await interaction.followup.send(embed=discord.Embed(title="💀 饿死了...", description=f"饥饿度0%倒下... 已重置 饥饿100% / 0km", color=0x000000), view=WalkView(interaction.user.id))
-            return
+            return 
 
     if not is_endless and prev_km < 1650 <= data["km"]:
         save_now(); await interaction.followup.send(embed=discord.Embed(title="⚠️ 进入中层 - 1650km", description="你已进入中层，接下来食物与燃料不会频繁出现了", color=0xff8800), view=WalkView(interaction.user.id)); return
@@ -781,29 +822,35 @@ async def do_walk_logic(interaction: discord.Interaction):
         return
 
     if not is_endless and data["km"] >= 3000 and not data["ended"]:
-        # 1% 隐藏结局
-        if random.random() < 0.01:
+        pity = data.get("rice_pity", 0)
+        chance = 0.01 + (pity * 0.01)
+        is_hit = random.random() < chance or pity >= 99
+
+        if is_hit:
             data["km"] = 3000
             data["ended"] = True
+            data["rice_pity"] = 0
             save_now()
             embed = discord.Embed(
                 title="—— 3000km，隐藏结局 - 稻田 ",
                 description=(
-                    "尤莉：千户！这里是......?\n"
-                    "千户：诶？稻田？\n\n"
-                    "在望不到头的稻田上，还有一个正方形的石头\n"
-                    "不是无尽的虚无，也没有寒冷的雪，取而代替的是一个由大量稻米组成的稻田\n\n"
-                    "千户：竟然是...稻米！太好了！\n"
-                    "尤莉：千户，我们是不是有吃不完的食物了\n"
-                    "千户：嗯，是的....\n\n"
-                    "—— 1% 隐藏结局触发\n\n"
-                    "(注意：这个隐藏结局是游戏作者自己加入的，跟原作毫无相关。)"
+                    f"尤莉：千户！这里是......?\n"
+                    f"千户：诶？稻田？\n\n"
+                    f"在望不到头的稻田上，还有一个正方形的石头\n"
+                    f"不是无尽的虚无，也没有寒冷的雪，取而代替的是一个由大量稻米组成的稻田\n\n"
+                    f"千户：竟然是...稻米！太好了！\n"
+                    f"尤莉：千户，我们是不是有吃不完的食物了\n"
+                    f"千户：嗯，是的....\n\n"
+                    f"—— 1% 隐藏结局触发 (保底 {pity+1}/100)\n\n"
+                    f"(注意：这个隐藏结局是游戏作者自己加入的，跟原作毫无相关。)"
                 ),
                 color=0xFFD700
             )
             embed.set_image(url="https://cdn.discordapp.com/attachments/1561003741052797019/1565650419374358558/images_30.jpg?ex=6ae5ad14&is=6ae45b94&hm=68483345fb91a55aa7877d2bbef814a2145e9e12f7d6837a9cac603f50782881&")
             await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
             return
+        else:
+            data["rice_pity"] = pity + 1
 
     # 原本的普通结局
         data["km"] = 3000
