@@ -220,8 +220,15 @@ class FixedStoryView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=FixedStoryView(self.user_id, self.story_id, self.page))
 class WalkView(discord.ui.View):
     def __init__(self, user_id):
-        super().__init__(timeout=None); self.user_id=user_id; p=get_player(user_id); self.add_item(FoodUseSelect(user_id, p["inventory"]))
-    @discord.ui.button(label="继续步行 (-5%饥饿)", style=discord.ButtonStyle.primary, emoji="🚶")
+        super().__init__(timeout=None)
+        self.user_id=user_id
+        p=get_player(user_id)
+        self.add_item(FoodUseSelect(user_id, p["inventory"]))
+        # 双语言
+        self.continue_walk.label = L(user_id, "继续步行 (-5%饥饿)", "Continue Walking (-5% Hunger)")
+        self.pause_walk.label = L(user_id, "暂停前进", "Pause Journey")
+
+    @discord.ui.button(style=discord.ButtonStyle.primary, emoji="🚶", row=1)
     async def continue_walk(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(L(self.user_id,"❌ 不是你的旅途","❌ Not your journey"), ephemeral=True); return
@@ -229,7 +236,8 @@ class WalkView(discord.ui.View):
         if is_paused(p):
             left=int(p["pause_until"]-time.time()); await interaction.response.send_message(L(self.user_id,f"⏸️ 暂停中，还剩 {left}秒",f"⏸️ Paused, {left}s left"), ephemeral=True); return
         await interaction.response.defer(); await do_walk_logic(interaction)
-    @discord.ui.button(label="暂停前进", style=discord.ButtonStyle.secondary, emoji="⏸️")
+
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="⏸️", row=1)
     async def pause_walk(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
         p=get_player(interaction.user.id); p["pause_until"]=time.time()+300; save_now()
