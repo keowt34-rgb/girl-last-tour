@@ -10,10 +10,25 @@ players = {}
 dev_mode_users = set()
 DEV_IDS = [1200298327531585537]
 
+save_lock = threading.Lock()
 FOOD_HUNGER = {
-    "压缩口粮 x10": 100, "军用口粮 x10": 100, "压缩口粮 x1": 15,
-    "土豆干 x2": 30, "土豆干": 15, "土豆干 x10": 100,
+    "压缩口粮 x10": 100, "军用口粮 x10": 100,
+    "压缩口粮 x1": 15,
+    "土豆干 x2": 30, "土豆干": 15, "土豆干 x10": 75,
+    "鱼": 65,
 }
+
+def save_now():
+    with save_lock:
+        try:
+            save_data = {
+                "players": {uid: {**pdata, "met_npcs": list(pdata["met_npcs"]), "ever_met": list(pdata.get("ever_met", []))} for uid, pdata in players.items()},
+                "dev_mode_users": list(dev_mode_users)
+            }
+            with open(SAVE_FILE, "w", encoding="utf-8") as f:
+                json.dump(save_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[SAVE] {e}")
 
 def load_save():
     global players, dev_mode_users
@@ -28,23 +43,13 @@ def load_save():
                     pdata["fixed_done"] = pdata.get("fixed_done", [])
                     pdata["in_fixed_story"] = pdata.get("in_fixed_story", None)
                     pdata["rice_pity"] = pdata.get("rice_pity", 0)
+                    pdata["name"] = pdata.get("name", f"玩家{str(uid)[-4:]}")
                     if "stats" not in pdata:
                         pdata["stats"] = {"normal":0,"rice":0,"endless_km":0,"total_km":0}
                     players[int(uid)] = pdata
                 dev_mode_users = set(data.get("dev_mode_users", []))
         except Exception as e:
             print(f"[SAVE] {e}")
-
-def save_now():
-    try:
-        save_data = {
-            "players": {uid: {**pdata, "met_npcs": list(pdata["met_npcs"]), "ever_met": list(pdata.get("ever_met", []))} for uid, pdata in players.items()},
-            "dev_mode_users": list(dev_mode_users)
-        }
-        with open(SAVE_FILE, "w", encoding="utf-8") as f:
-            json.dump(save_data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"[SAVE] {e}")
 
 load_save()
 
@@ -424,12 +429,13 @@ class WalkView(discord.ui.View):
         await do_walk_logic(interaction)
     @discord.ui.button(label="暂停前进", style=discord.ButtonStyle.secondary, emoji="⏸️")
     async def pause_walk(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id: return
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ 不是你的旅途", ephemeral=True); return
         p = get_player(interaction.user.id)
         p["pause_until"] = time.time() + 300
         save_now()
         await interaction.response.edit_message(embed=discord.Embed(title="⏸️ 已暂停前进 5分钟", color=0x555555), view=ResumeView(self.user_id))
-
+        
 class ResumeView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=None)
@@ -577,11 +583,13 @@ class GiveView(discord.ui.View):
     @discord.ui.button(label="确认给予", style=discord.ButtonStyle.success, emoji="🎁")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
+        if not self.offer:
+            await interaction.response.send_message("❌ 请先选物品", ephemeral=True); return
         p = get_player(self.user_id)
         p["inventory"].append(self.offer); sync_item(p, self.offer, add=True)
         save_now()
         await interaction.response.edit_message(embed=discord.Embed(title="DEV给予成功", description=f"已获得 {self.offer}\n饥饿{p['hunger']}% 燃料{p['fuel']}", color=0xffd700), view=None)
-
+        
 @bot.event
 async def on_ready():
     await bot.tree.sync()
@@ -682,8 +690,9 @@ async def 无尽模式(interaction: discord.Interaction):
     else:
         await interaction.response.send_message(embed=discord.Embed(title="返回普通模式？", description="⚠️ 无尽进度会消失\n确定返回普通模式吗", color=0xff8800), view=EndlessConfirmView(interaction.user.id, False), ephemeral=True)
 
-async def do_walk_logic(interaction: discord.Interaction):
+async def do_walk_logic(interaction):
     data = get_player(interaction.user.id)
+    data["name"] = interaction.user.display_name  
     is_dev_now = interaction.user.id in dev_mode_users
     is_endless = data.get("endless", False)
     prev_km = data["km"]
@@ -723,8 +732,8 @@ async def do_walk_logic(interaction: discord.Interaction):
             return
 
     data["step"] += 1
-    has_bike = any(("Kettenkrad" in i or "履带摩托" in i) and "浴缸" not in i for i in data["inventory"])
-
+    has_bike = any(i in ["Kettenkrad履带摩托", "Kettenkrad履带摩托 x1"] for i in data["inventory"])
+    
     if data["step"] == 5 and not is_endless:
         save_now()
         embed = discord.Embed(title="📍 看到了夜晚的月光 ", description="尤莉：哇！是星空耶！\n千户：嗯！\n尤莉：快看那个星星！", color=0x8b9a7d)
@@ -809,7 +818,7 @@ async def do_walk_logic(interaction: discord.Interaction):
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565001787013079181/Screenshot_20261028_215740.jpg?ex=6ae4a27e&is=6ae350fe&hm=132eeaa5e705c08425bc46743d5d843ada7fc3b882a2a06a4904b097c6ec8cdc&")
         await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id)); return
 
-        if not is_dev_now:
+    if not is_dev_now:
         if data["step"] > 10:
             data["hunger"] = max(0, data["hunger"] - 5)
         if data["fuel"] > 0:
@@ -996,44 +1005,22 @@ async def 排行榜(interaction: discord.Interaction):
     if not players:
         await interaction.followup.send("还没人开始旅行呢...")
         return
-    
-    # 按通关次数排序
     sorted_list = sorted(players.items(), key=lambda x: (x[1].get("stats", {}).get("normal", 0), x[1].get("stats", {}).get("total_km", 0)), reverse=True)
-    
     embed = discord.Embed(title="🏆 终末之旅 排行榜", color=0xFFD700)
     embed.description = "赛季第12期 • 仅计入已认证通关记录\n\n"
-    
     text = ""
     for rank, (uid, pdata) in enumerate(sorted_list[:10], 1):
         s = pdata.get("stats", {"normal":0,"rice":0,"endless_km":0,"total_km":0})
-        try:
-            user = await bot.fetch_user(uid)
-            name = user.display_name
-        except:
-            name = f"玩家{str(uid)[-4:]}"
-        
-        if rank == 1:
-            icon = "🥇"
-        elif rank == 2:
-            icon = "🥈"
-        elif rank == 3:
-            icon = "🥉"
-        else:
-            icon = f"`{rank}.`"
-        
+        name = pdata.get("name", f"玩家{str(uid)[-4:]}")
+        icon = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"`{rank}.`"
         text += f"{icon} **{name}**\n> 通关 {s.get('normal',0)}次 | 隐藏 {s.get('rice',0)}次 | 无尽 {s.get('endless_km',0)}km\n\n"
-    
     embed.description += text
-    
-    # 显示自己的
     my = players.get(interaction.user.id)
     if my:
         s = my.get("stats", {})
         my_rank = [i[0] for i in sorted_list].index(interaction.user.id) + 1 if interaction.user.id in [i[0] for i in sorted_list] else "?"
         embed.add_field(name=f"你的排名: #{my_rank}", value=f"通关 {s.get('normal',0)}次 | 隐藏 {s.get('rice',0)}次 | 无尽 {s.get('endless_km',0)}km | 总 {s.get('total_km',0)}km", inline=False)
-    
-    embed.set_footer(text=f"总旅行者: {len(players)}人 • /leaderboard 查看完整榜单 • 更新每6小时")
-    
+    embed.set_footer(text=f"总旅行者: {len(players)}人 • /排行榜 查看")
     await interaction.followup.send(embed=embed)
 
 threading.Thread(target=run_flask, daemon=True).start()
