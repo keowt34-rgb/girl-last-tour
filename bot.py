@@ -28,6 +28,8 @@ def load_save():
                     pdata["fixed_done"] = pdata.get("fixed_done", [])
                     pdata["in_fixed_story"] = pdata.get("in_fixed_story", None)
                     pdata["rice_pity"] = pdata.get("rice_pity", 0)
+                    if "stats" not in pdata:
+                        pdata["stats"] = {"normal":0,"rice":0,"endless_km":0,"total_km":0}
                     players[int(uid)] = pdata
                 dev_mode_users = set(data.get("dev_mode_users", []))
         except Exception as e:
@@ -306,32 +308,26 @@ def roll(npc):
         if r<=cur: return item
     return table[-1][0]
 
-def get_player(uid):
-    if uid not in players:
-        players[uid] = {
-            "km":0,"hunger":100,"fuel":28,"step":0,"visited_airplane":False,"ended":False,
-            "bike_scrapped":False,"bath_to_delete":False,"endless":False,"pause_until":0,
-            "met_npcs":set(["千户","尤莉"]),
-            "ever_met":set(["千户","尤莉"]),
-            "npc_met_km":{"千户":0,"尤莉":0},
-            "inventory":["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"],
-            "fixed_done": [],
-            "in_fixed_story": None,
-            "rice_pity": 0
+def get_player(user_id):
+    if user_id not in players:
+        players[user_id] = {
+            "km": 0, "hunger": 100, "fuel": 28, "step": 0,
+            "visited_airplane": False, "ended": False,
+            "bike_scrapped": False, "bath_to_delete": False,
+            "endless": False, "pause_until": 0,
+            "met_npcs": set(["千户","尤莉"]),
+            "ever_met": set(["千户","尤莉"]),
+            "npc_met_km": {"千户":0,"尤莉":0},
+            "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"],
+            "fixed_done": [], "in_fixed_story": None, "rice_pity": 0,
+            "stats": {"normal":0,"rice":0,"endless_km":0,"total_km":0} # 排行榜用的
         }
-        save_now()
-    p = players[uid]
-    if "hunger" not in p or p["hunger"] is None: p["hunger"] = 100
-    if "food" in p: del p["food"]
-    if "bike_scrapped" not in p: p["bike_scrapped"]=False
-    if "bath_to_delete" not in p: p["bath_to_delete"]=False
-    if "endless" not in p: p["endless"]=False
-    if "pause_until" not in p: p["pause_until"]=0
-    if "ever_met" not in p: p["ever_met"]=set(p["met_npcs"])
-    if "npc_met_km" not in p: p["npc_met_km"]={}
-    if "fixed_done" not in p: p["fixed_done"]=[]
-    if "in_fixed_story" not in p: p["in_fixed_story"]=None
-    if "rice_pity" not in p: p["rice_pity"]=0
+    p = players[user_id]
+    # 老玩家补数据
+    if "stats" not in p: p["stats"] = {"normal":0,"rice":0,"endless_km":0,"total_km":0}
+    if "rice_pity" not in p: p["rice_pity"] = 0
+    if "fixed_done" not in p: p["fixed_done"] = []
+    if "in_fixed_story" not in p: p["in_fixed_story"] = None
     return p
 
 def is_paused(p):
@@ -455,13 +451,37 @@ class EndlessConfirmView(discord.ui.View):
     @discord.ui.button(label="确定", style=discord.ButtonStyle.danger, emoji="⚠️")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
-        old_pity = get_player(interaction.user.id).get("rice_pity", 0)
+        old = get_player(interaction.user.id)
+        old_pity = old.get("rice_pity", 0)
+        old_stats = old.get("stats", {"normal":0,"rice":0,"endless_km":0,"total_km":0})
         if self.to_endless:
-            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": True, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
+            players[interaction.user.id] = {
+                "km": 0, "hunger": 100, "fuel": 38, "step": 0,
+                "visited_airplane": False, "ended": False,
+                "bike_scrapped": False, "bath_to_delete": False,
+                "endless": True, "pause_until":0,
+                "met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
+                "ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]),
+                "npc_met_km": {"千户":0,"尤莉":0},
+                "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"],
+                "fixed_done": [], "in_fixed_story": None,
+                "rice_pity": old_pity, "stats": old_stats
+            }
         else:
-            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
+            players[interaction.user.id] = {
+                "km": 0, "hunger": 100, "fuel": 28, "step": 0,
+                "visited_airplane": False, "ended": False,
+                "bike_scrapped": False, "bath_to_delete": False,
+                "endless": False, "pause_until":0,
+                "met_npcs": set(["千户","尤莉"]),
+                "ever_met": set(["千户","尤莉"]),
+                "npc_met_km": {"千户":0,"尤莉":0},
+                "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"],
+                "fixed_done": [], "in_fixed_story": None,
+                "rice_pity": old_pity, "stats": old_stats
+            }
         save_now()
-        await interaction.response.edit_message(embed=discord.Embed(title="已切换", color=0x00ffaa), view=None)
+        await interaction.response.edit_message(embed=discord.Embed(title="已切换", description="保底和排行榜已保留", color=0x00ffaa), view=None)
 
 class RestartView(discord.ui.View):
     def __init__(self, user_id):
@@ -469,10 +489,23 @@ class RestartView(discord.ui.View):
     @discord.ui.button(label="重新开始", style=discord.ButtonStyle.primary, emoji="🔄")
     async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
-        old_pity = get_player(interaction.user.id).get("rice_pity", 0)
-        players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False,"bath_to_delete": False,"endless": False, "pause_until":0,"met_npcs": set(["千户","尤莉"]),"ever_met": set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
+        old = get_player(interaction.user.id)
+        old_pity = old.get("rice_pity", 0)
+        old_stats = old.get("stats", {"normal":0,"rice":0,"endless_km":0,"total_km":0})
+        players[interaction.user.id] = {
+            "km": 0, "hunger": 100, "fuel": 28, "step": 0,
+            "visited_airplane": False, "ended": False,
+            "bike_scrapped": False, "bath_to_delete": False,
+            "endless": False, "pause_until":0,
+            "met_npcs": set(["千户","尤莉"]),
+            "ever_met": set(["千户","尤莉"]),
+            "npc_met_km": {"千户":0,"尤莉":0},
+            "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"],
+            "fixed_done": [], "in_fixed_story": None,
+            "rice_pity": old_pity, "stats": old_stats
+        }
         save_now()
-        await interaction.response.edit_message(embed=discord.Embed(title="🔄 重新开始 0km 饥饿100%", color=0x8b9a7d), view=None)
+        await interaction.response.edit_message(embed=discord.Embed(title="🔄 重新开始 0km 饥饿100%", description="保底和排行榜已保留", color=0x8b9a7d), view=None)
 
 class TradeView(discord.ui.View):
     def __init__(self, from_id, to_id=None, npc_name=None, inventory=None):
@@ -726,6 +759,12 @@ async def do_walk_logic(interaction: discord.Interaction):
             move = random.randint(3, 6)
         data["km"] += move
 
+    if "stats" not in data:
+        data["stats"] = {"normal":0,"rice":0,"endless_km":0,"total_km":0}
+    data["stats"]["total_km"] += move
+    if is_endless:
+        data["stats"]["endless_km"] += move
+        
     # 检查有没有到固定关卡
     prev_step = data["step"] - 1
     for story_id, story in FIXED_STORIES.items():
@@ -770,16 +809,28 @@ async def do_walk_logic(interaction: discord.Interaction):
         embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1565001787013079181/Screenshot_20261028_215740.jpg?ex=6ae4a27e&is=6ae350fe&hm=132eeaa5e705c08425bc46743d5d843ada7fc3b882a2a06a4904b097c6ec8cdc&")
         await interaction.followup.send(embed=embed, view=WalkView(interaction.user.id)); return
 
-    if not is_dev_now:
+        if not is_dev_now:
         if data["step"] > 10:
             data["hunger"] = max(0, data["hunger"] - 5)
         if data["fuel"] > 0:
             data["fuel"] = max(0, data["fuel"] - 1)
         if data["hunger"] <= 0:
             old_pity = data.get("rice_pity", 0)
-            players[interaction.user.id] = {"km": 0, "hunger": 100, "fuel": 38 if is_endless else 28, "step": 0,"visited_airplane": False, "ended": False,"bike_scrapped": False, "bath_to_delete": False, "endless": is_endless, "pause_until":0,"met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),"npc_met_km": {"千户":0,"尤莉":0},"inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"] if is_endless else ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"], "fixed_done": [], "in_fixed_story": None, "rice_pity": old_pity}
+            old_stats = data.get("stats", {"normal":0,"rice":0,"endless_km":0,"total_km":0})
+            players[interaction.user.id] = {
+                "km": 0, "hunger": 100, "fuel": 38 if is_endless else 28, "step": 0,
+                "visited_airplane": False, "ended": False,
+                "bike_scrapped": False, "bath_to_delete": False,
+                "endless": is_endless, "pause_until":0,
+                "met_npcs": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),
+                "ever_met": set(["千户","尤莉","金泽","石像爷爷","石井","管制官","努可"]) if is_endless else set(["千户","尤莉"]),
+                "npc_met_km": {"千户":0,"尤莉":0},
+                "inventory": ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","毛毯 x2"] if is_endless else ["Kettenkrad履带摩托","38式步枪","手枪与一发子弹","千户的日记","毛毯 x2","土豆干 x2","压缩口粮 x1"],
+                "fixed_done": [], "in_fixed_story": None,
+                "rice_pity": old_pity, "stats": old_stats
+            }
             save_now()
-            await interaction.followup.send(embed=discord.Embed(title="💀 饿死了...", description=f"饥饿度0%倒下... 已重置 饥饿100% / 0km", color=0x000000), view=WalkView(interaction.user.id))
+            await interaction.followup.send(embed=discord.Embed(title="💀 饿死了...", description=f"饥饿度0%倒下... 已重置 饥饿100% / 0km\n保底和排行榜已保留", color=0x000000), view=WalkView(interaction.user.id))
             return 
 
     if not is_endless and prev_km < 1650 <= data["km"]:
@@ -830,6 +881,8 @@ async def do_walk_logic(interaction: discord.Interaction):
             data["km"] = 3000
             data["ended"] = True
             data["rice_pity"] = 0
+            data["stats"]["rice"] += 1
+            data["stats"]["normal"] += 1
             save_now()
             embed = discord.Embed(
                 title="—— 3000km，隐藏结局 - 稻田 ",
@@ -851,19 +904,18 @@ async def do_walk_logic(interaction: discord.Interaction):
             return
         else:
             data["rice_pity"] = pity + 1
-
-    # 原本的普通结局
-        data["km"] = 3000
-        data["ended"] = True
-        save_now()
-        embed = discord.Embed(
-            title="—— 3000km，虚无的上层",
-            description="......嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完",
-            color=0x000000
-        )
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae52af4&is=6ae3d974&hm=56d64ddcd4c31ce90adc48d6e4e6262e7f3d260c3c3de1902bab22fc6df15dc5&")
-        await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
-        return
+            data["km"] = 3000
+            data["ended"] = True
+            data["stats"]["normal"] += 1
+            save_now()
+            embed = discord.Embed(
+                title="—— 3000km，虚无的上层",
+                description="......嗯。\n\n千户：我们现在这样，是正确的吗？\n尤莉：我们现在是世界上最幸福的人。\n—— 少女终末旅行 完",
+                color=0x000000
+            )
+            embed.set_image(url="https://cdn.discordapp.com/attachments/1519326691095478272/1564967119534432256/images_32.jpg?ex=6ae52af4&is=6ae3d974&hm=56d64ddcd4c31ce90adc48d6e4e6262e7f3d260c3c3de1902bab22fc6df15dc5&")
+            await interaction.followup.send(embed=embed, view=RestartView(interaction.user.id))
+            return
 
     if is_endless:
         last_150 = (prev_km // 150) * 150
@@ -937,6 +989,52 @@ async def 交易(interaction: discord.Interaction, 用户: discord.Member=None, 
         if not 用户: await interaction.followup.send("❌ 请@玩家或选NPC", ephemeral=True); return
         view = TradeView(interaction.user.id, to_id=用户.id, inventory=d["inventory"])
         await interaction.followup.send(embed=discord.Embed(title=f"与 {用户.display_name} 交易"), view=view, ephemeral=True)
+
+@bot.tree.command(name="排行榜", description="查看全服排行榜")
+async def 排行榜(interaction: discord.Interaction):
+    await interaction.response.defer()
+    if not players:
+        await interaction.followup.send("还没人开始旅行呢...")
+        return
+    
+    # 按通关次数排序
+    sorted_list = sorted(players.items(), key=lambda x: (x[1].get("stats", {}).get("normal", 0), x[1].get("stats", {}).get("total_km", 0)), reverse=True)
+    
+    embed = discord.Embed(title="🏆 终末之旅 排行榜", color=0xFFD700)
+    embed.description = "赛季第12期 • 仅计入已认证通关记录\n\n"
+    
+    text = ""
+    for rank, (uid, pdata) in enumerate(sorted_list[:10], 1):
+        s = pdata.get("stats", {"normal":0,"rice":0,"endless_km":0,"total_km":0})
+        try:
+            user = await bot.fetch_user(uid)
+            name = user.display_name
+        except:
+            name = f"玩家{str(uid)[-4:]}"
+        
+        if rank == 1:
+            icon = "🥇"
+        elif rank == 2:
+            icon = "🥈"
+        elif rank == 3:
+            icon = "🥉"
+        else:
+            icon = f"`{rank}.`"
+        
+        text += f"{icon} **{name}**\n> 通关 {s.get('normal',0)}次 | 隐藏 {s.get('rice',0)}次 | 无尽 {s.get('endless_km',0)}km\n\n"
+    
+    embed.description += text
+    
+    # 显示自己的
+    my = players.get(interaction.user.id)
+    if my:
+        s = my.get("stats", {})
+        my_rank = [i[0] for i in sorted_list].index(interaction.user.id) + 1 if interaction.user.id in [i[0] for i in sorted_list] else "?"
+        embed.add_field(name=f"你的排名: #{my_rank}", value=f"通关 {s.get('normal',0)}次 | 隐藏 {s.get('rice',0)}次 | 无尽 {s.get('endless_km',0)}km | 总 {s.get('total_km',0)}km", inline=False)
+    
+    embed.set_footer(text=f"总旅行者: {len(players)}人 • /leaderboard 查看完整榜单 • 更新每6小时")
+    
+    await interaction.followup.send(embed=embed)
 
 threading.Thread(target=run_flask, daemon=True).start()
 bot.run(os.getenv("DISCORD_TOKEN"))
