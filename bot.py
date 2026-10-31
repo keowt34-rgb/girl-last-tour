@@ -274,16 +274,31 @@ class RestartView(discord.ui.View):
         save_now(); await interaction.response.edit_message(embed=discord.Embed(title=L(self.user_id,"🔄 重新开始","🔄 Restart"), color=0x8b9a7d), view=None)
 class TradeView(discord.ui.View):
     def __init__(self, from_id, to_id=None, npc_name=None, inventory=None):
-        super().__init__(timeout=120); self.from_id=from_id; self.to_id=to_id; self.npc_name=npc_name; self.offer=None; inv=inventory or []
+        super().__init__(timeout=120)
+        self.from_id=from_id
+        self.to_id=to_id
+        self.npc_name=npc_name
+        self.offer=None
+        inv=inventory or []
         if inv:
-            _, counter=format_backpack(inv); unique=get_unique_for_trade(inv)
+            _, counter=format_backpack(inv)
+            unique=get_unique_for_trade(inv)
             opts=[discord.SelectOption(label=f"{I(from_id,item)} (x{counter[item]})"[:100] if counter[item]>1 else I(from_id,item)[:100], value=f"{idx}|{item}") for idx, item in enumerate(unique[:25])]
-            self.select_give=discord.ui.Select(placeholder=L(from_id,f"选择物品 共{len(inv)}件",f"Select item Total {len(inv)}"), min_values=1, max_values=1, options=opts); self.select_give.callback=self.select_callback; self.add_item(self.select_give)
+            self.select_give=discord.ui.Select(placeholder=L(from_id,f"选择物品 共{len(inv)}件",f"Select item Total {len(inv)}"), min_values=1, max_values=1, options=opts)
+            self.select_give.callback=self.select_callback
+            self.add_item(self.select_give)
+        
+        # 双语言按钮
+        self.confirm.label = L(from_id, "确认交易", "Confirm Trade")
+        self.retrade.label = L(from_id, "重新交易", "Reroll Trade")
+
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.from_id: return
-        _, item_name=self.select_give.values[0].split("|",1); self.offer=item_name
+        _, item_name=self.select_give.values[0].split("|",1)
+        self.offer=item_name
         await interaction.response.send_message(L(self.from_id,f"已选择：**{item_name}**",f"Selected: **{I(self.from_id,item_name)}**"), ephemeral=True)
-    @discord.ui.button(label="确认交易", style=discord.ButtonStyle.success, emoji="🤝")
+
+    @discord.ui.button(style=discord.ButtonStyle.success, emoji="🤝")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.from_id: return
         if not self.offer:
@@ -293,20 +308,30 @@ class TradeView(discord.ui.View):
             await interaction.response.send_message(L(self.from_id,"❌ 物品不在了","❌ Item gone"), ephemeral=True); return
         sync_item(p, self.offer, add=False)
         if self.npc_name:
-            reward=roll(self.npc_name); p["inventory"].remove(self.offer); p["inventory"].append(reward); sync_item(p, reward, add=True)
+            reward=roll(self.npc_name)
+            p["inventory"].remove(self.offer)
+            p["inventory"].append(reward)
+            sync_item(p, reward, add=True)
             sp=SPECIAL_REWARDS.get(reward)
             if sp:
                 if sp["effect"]=="fuel_full": p["fuel"]=999
                 if sp["effect"]=="fuel+100": p["fuel"]+=100
                 if sp["effect"]=="END": p["ended"]=True
-            lang=get_lang(self.from_id); txt=sp[f"text_{lang}"] if sp else ""
+            lang=get_lang(self.from_id)
+            txt=sp[f"text_{lang}"] if sp else ""
             emb=discord.Embed(title=f"✨ {I(self.from_id,reward)}", description=f"{txt}\n\n{I(self.from_id,self.offer)} -> {I(self.from_id,reward)}", color=sp["color"] if sp else ALL_NPCS[self.npc_name]["color"])
             if sp and sp.get("image"): emb.set_image(url=sp["image"])
-            save_now(); await interaction.response.edit_message(embed=emb, view=TradeView(self.from_id, to_id=self.to_id, npc_name=self.npc_name, inventory=p["inventory"]))
+            save_now()
+            await interaction.response.edit_message(embed=emb, view=TradeView(self.from_id, to_id=self.to_id, npc_name=self.npc_name, inventory=p["inventory"]))
         else:
-            target=get_player(self.to_id); target["inventory"].append(self.offer); sync_item(target, self.offer, add=True); p["inventory"].remove(self.offer); save_now()
+            target=get_player(self.to_id)
+            target["inventory"].append(self.offer)
+            sync_item(target, self.offer, add=True)
+            p["inventory"].remove(self.offer)
+            save_now()
             await interaction.response.edit_message(embed=discord.Embed(title=L(self.from_id,"交易完成","Trade Done"), description=f"{I(self.from_id,self.offer)}"), view=TradeView(self.from_id, to_id=self.to_id, npc_name=self.npc_name, inventory=p["inventory"]))
-    @discord.ui.button(label="重新交易", style=discord.ButtonStyle.secondary, emoji="🔄")
+
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="🔄")
     async def retrade(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.from_id: return
         p=get_player(self.from_id)
