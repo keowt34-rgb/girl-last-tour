@@ -482,7 +482,7 @@ async def on_guild_join(guild: discord.Guild):
             await user.send(embed=e, view=LanguageView(user.id))
         except: pass
 
-@bot.tree.command(name="dev", description="Dev mode", name_localizations={"zh-CN": "开发者"}, description_localizations={"zh-CN": "开发者模式[仅限]"})
+@bot.tree.command(name="dev", description="Dev mode [Owner only]", name_localizations={"zh-CN": "开发者", "zh-TW": "開發者"}, description_localizations={"zh-CN": "开发者模式[仅限]", "zh-TW": "開發者模式[僅限]"})
 async def dev_cmd(interaction: discord.Interaction):
     if interaction.user.id not in DEV_IDS:
         await interaction.response.send_message(L(interaction.user.id,"❌ 不是开发者","❌ Not dev"), ephemeral=True); return
@@ -497,20 +497,20 @@ async def dev_cmd(interaction: discord.Interaction):
         await interaction.response.send_message(embed=discord.Embed(title=L(interaction.user.id,"DEV 已开启","DEV ON"), color=0xffd700))
     save_now()
 
-@bot.tree.command(name="jump", description="Dev jump", name_localizations={"zh-CN": "跳跃"}, description_localizations={"zh-CN": "开发者跳跃"})
+@bot.tree.command(name="jump", description="Jump to km [Dev]", name_localizations={"zh-CN": "跳跃", "zh-TW": "跳躍"}, description_localizations={"zh-CN": "跳跃到指定公里[开发者]", "zh-TW": "跳躍到指定公里[開發者]"})
 async def jump_cmd(interaction: discord.Interaction, km: int):
     if interaction.user.id not in dev_mode_users:
         await interaction.response.send_message(L(interaction.user.id,"❌ 需先 /开发者","❌ Need /dev"), ephemeral=True); return
     d=get_player(interaction.user.id); d["km"]=km; d["step"]+=1; save_now()
     await interaction.response.send_message(embed=discord.Embed(title="DEV跳跃 / DEV Jump", description=f"{L(interaction.user.id,'已到','Now at')} {km}km", color=0xffd700))
 
-@bot.tree.command(name="give", description="Dev give item", name_localizations={"zh-CN": "给予"}, description_localizations={"zh-CN": "开发者给予"})
+@bot.tree.command(name="give", description="Give item [Dev]", name_localizations={"zh-CN": "给予", "zh-TW": "給予"}, description_localizations={"zh-CN": "给予物品[开发者]", "zh-TW": "給予物品[開發者]"})
 async def give_cmd(interaction: discord.Interaction):
     if interaction.user.id not in dev_mode_users:
         await interaction.response.send_message(L(interaction.user.id,"❌ 需先 /开发者","❌ Need /dev"), ephemeral=True); return
     await interaction.response.send_message(embed=discord.Embed(title=L(interaction.user.id,"DEV给予","DEV Give")), view=GiveView(interaction.user.id, inventory=ALL_ITEMS_POOL), ephemeral=True)
 
-@bot.tree.command(name="endless", description="Toggle endless mode", name_localizations={"zh-CN": "无尽模式"}, description_localizations={"zh-CN": "开启/关闭无尽模式"})
+@bot.tree.command(name="endless", description="Enter endless mode", name_localizations={"zh-CN": "无尽模式", "zh-TW": "無盡模式"}, description_localizations={"zh-CN": "进入无尽模式", "zh-TW": "進入無盡模式"})
 async def endless_cmd(interaction: discord.Interaction):
     d = get_player(interaction.user.id)
     if not d.get("endless", False):
@@ -518,7 +518,7 @@ async def endless_cmd(interaction: discord.Interaction):
     else:
         await interaction.response.send_message(embed=discord.Embed(title=L(interaction.user.id,"返回普通模式？","Return to normal?"), description=L(interaction.user.id,"⚠️ 无尽进度会消失\n确定返回普通模式吗","⚠️ Endless progress lost\nConfirm?"), color=0xff8800), view=EndlessConfirmView(interaction.user.id, False), ephemeral=True)
 
-@bot.tree.command(name="language", description="Switch language", name_localizations={"zh-CN": "语言"}, description_localizations={"zh-CN": "切换语言 中文/English"})
+@bot.tree.command(name="language", description="Switch language", name_localizations={"zh-CN": "语言", "zh-TW": "語言"}, description_localizations={"zh-CN": "切换语言", "zh-TW": "切換語言"})
 async def language_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(embed=discord.Embed(title="🌐 选择语言 / Choose Language", description=L(interaction.user.id,"点击下方按钮切换，剧情、名字、食物全部会变英文","Click button below, all names, food, story will switch to English")), view=LanguageView(interaction.user.id), ephemeral=True)
 
@@ -729,12 +729,12 @@ async def do_walk_logic(interaction):
         embed.set_author(name=f"{'♾️' if is_endless else ''}{data['km']}km | {hunger_l}{data['hunger']}% {fuel_l}{data['fuel']} +{move}km")
         await interaction.followup.send(embed=embed, view=WalkView(uid)); return
 
-@bot.tree.command(name="walk", description="Walk 3000km to upper layer", name_localizations={"zh-CN": "步行", "zh-TW": "步行"}, description_localizations={"zh-CN": "步行3000km到上层", "zh-TW": "步行3000km到上层"})
+@bot.tree.command(name="walk", description="Walk 3000km to upper layer", name_localizations={"zh-CN": "步行", "zh-TW": "步行"}, description_localizations={"zh-CN": "步行3000km到上层", "zh-TW": "步行3000km到上層"})
 async def walk_cmd(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=False)
     await do_walk_logic(interaction)
 
-@bot.tree.command(name="backpack", description="Check backpack", name_localizations={"zh-CN": "背包", "zh-TW": "背包"}, description_localizations={"zh-CN": "查看背包", "zh-TW": "查看背包"})
+@bot.tree.command(name="backpack", description="Check your backpack", name_localizations={"zh-CN": "背包", "zh-TW": "背包"}, description_localizations={"zh-CN": "查看背包", "zh-TW": "查看背包"})
 async def backpack_cmd(interaction: discord.Interaction):
     d=get_player(interaction.user.id)
     lines, _=format_backpack(d["inventory"], interaction.user.id)
@@ -745,7 +745,7 @@ async def backpack_cmd(interaction: discord.Interaction):
     embed=discord.Embed(title=f"{'♾️ ' if d.get('endless') else ''}{d['km']}km {backpack_l} - {d['hunger']}%{hunger_l} {d['fuel']}{fuel_l}", description=text, color=0x00ffaa if d.get('endless') else 0x8b9a7d)
     await interaction.response.send_message(embed=embed, view=WalkView(interaction.user.id))
 
-@bot.tree.command(name="trade", description="Trade with NPC or player", name_localizations={"zh-CN": "交易", "zh-TW": "交易"}, description_localizations={"zh-CN": "与NPC或玩家交易", "zh-TW": "与NPC或玩家交易"})
+@bot.tree.command(name="trade", description="Trade items with NPC", name_localizations={"zh-CN": "交易", "zh-TW": "交易"}, description_localizations={"zh-CN": "与NPC交易物品", "zh-TW": "與NPC交易物品"})
 @discord.app_commands.choices(npc=[discord.app_commands.Choice(name=NPC_EN.get(k,k), value=k) for k in ALL_NPCS.keys()])
 async def trade_cmd(interaction: discord.Interaction, 用户: discord.Member=None, npc: str=None):
     await interaction.response.defer(ephemeral=True)
@@ -765,7 +765,7 @@ async def trade_cmd(interaction: discord.Interaction, 用户: discord.Member=Non
         title_en = f"Trade with {用户.display_name}"
         await interaction.followup.send(embed=discord.Embed(title=L(interaction.user.id,title_zh,title_en)), view=view, ephemeral=True)
 
-@bot.tree.command(name="leaderboard", description="View leaderboard", name_localizations={"zh-CN": "排行榜", "zh-TW": "排行榜"}, description_localizations={"zh-CN": "查看全服排行榜", "zh-TW": "查看全服排行榜"})
+@bot.tree.command(name="leaderboard", description="Show distance leaderboard", name_localizations={"zh-CN": "排行榜", "zh-TW": "排行榜"}, description_localizations={"zh-CN": "显示距离排行榜", "zh-TW": "顯示距離排行榜"})
 async def leaderboard_cmd(interaction: discord.Interaction):
     await interaction.response.defer()
     if not players:
