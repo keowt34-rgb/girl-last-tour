@@ -223,12 +223,13 @@ class WalkView(discord.ui.View):
         super().__init__(timeout=None)
         self.user_id=user_id
         p=get_player(user_id)
-        self.add_item(FoodUseSelect(user_id, p["inventory"]))
-        # 双语言
+        food_select = FoodUseSelect(user_id, p["inventory"])
+        food_select.row = 1
+        self.add_item(food_select)
         self.continue_walk.label = L(user_id, "继续步行 (-5%饥饿)", "Continue Walking (-5% Hunger)")
         self.pause_walk.label = L(user_id, "暂停前进", "Pause Journey")
 
-    @discord.ui.button(style=discord.ButtonStyle.primary, emoji="🚶", row=1)
+    @discord.ui.button(style=discord.ButtonStyle.primary, emoji="🚶", row=0)
     async def continue_walk(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(L(self.user_id,"❌ 不是你的旅途","❌ Not your journey"), ephemeral=True); return
@@ -237,7 +238,7 @@ class WalkView(discord.ui.View):
             left=int(p["pause_until"]-time.time()); await interaction.response.send_message(L(self.user_id,f"⏸️ 暂停中，还剩 {left}秒",f"⏸️ Paused, {left}s left"), ephemeral=True); return
         await interaction.response.defer(); await do_walk_logic(interaction)
 
-    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="⏸️", row=1)
+    @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="⏸️", row=0)
     async def pause_walk(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id: return
         p=get_player(interaction.user.id); p["pause_until"]=time.time()+300; save_now()
