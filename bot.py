@@ -159,6 +159,7 @@ FIXED_STORIES = {
             7: "https://cdn.discordapp.com/attachments/1566063305385316543/1566063599850364928/Screenshot_20261030_140159_com.android.chrome_edit_18549156629460.jpg?ex=6ae72de2&is=6ae5dc62&hm=60c8fe2d96c2fbd55ccdab353b4bc1539bd4e0f6eef05ab333360879d647b000&"
         }
     },
+}
 def roll(npc):
     table = DROP_TABLE.get(npc, [("垃圾", 100)]); r=random.randint(1,100); cur=0
     for item,p in table:
